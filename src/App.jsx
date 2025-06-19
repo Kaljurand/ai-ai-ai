@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
+import {
+  Button,
+  TextField,
+  Select,
+  MenuItem,
+  Drawer,
+  IconButton,
+  AppBar,
+  Toolbar,
+  Typography,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -25,6 +37,10 @@ export default function App() {
   const [googleModels, setGoogleModels] = useState([]);
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [genPrompt, setGenPrompt] = useStoredState('genPrompt', 'Generate a realistic Estonian weather report');
+  const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
+  const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
 
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
@@ -35,7 +51,13 @@ export default function App() {
         'Authorization': `Bearer ${apiKeys.openai}`
       }
     })
-      .then(r => r.json())
+      .then(async r => {
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.error?.message || 'Failed to fetch OpenAI models');
+        }
+        return r.json();
+      })
       .then(data => {
         const models = data.data?.map(m => m.id).sort();
         if (models?.length) {
@@ -43,13 +65,19 @@ export default function App() {
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
       })
-      .catch(() => {});
+      .catch(e => setStatus(e.message));
   }, [apiKeys.openai]);
 
   useEffect(() => {
     if (!apiKeys.google) return;
     fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`)
-      .then(r => r.json())
+      .then(async r => {
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.error?.message || 'Failed to fetch Google models');
+        }
+        return r.json();
+      })
       .then(data => {
         const models = data.models?.map(m => m.name);
         if (models?.length) {
@@ -57,7 +85,7 @@ export default function App() {
           if (!models.includes(googleModel)) setGoogleModel(models[0]);
         }
       })
-      .catch(() => {});
+      .catch(e => setStatus(e.message));
   }, [apiKeys.google]);
 
   const generateText = async () => {
@@ -68,15 +96,21 @@ export default function App() {
       setStatus('');
       return;
     }
-    const prompt = 'Loo keeruline lühike eestikeelne tekst, mis sisaldab numbreid ja lühendeid.';
+    const prompt = genPrompt;
     let text = '';
     if (provider === 'google') {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: { text: prompt } })
-      }).then(r => r.json());
-      text = res.candidates?.[0]?.output?.trim();
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        setStatus(e.error?.message || 'Text generation failed');
+        return;
+      }
+      const data = await res.json();
+      text = data.candidates?.[0]?.output?.trim();
     } else {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -88,10 +122,16 @@ export default function App() {
           model: openAiModel,
           messages: [{ role: 'user', content: prompt }]
         })
-      }).then(r => r.json());
-      text = res.choices?.[0]?.message?.content?.trim();
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        setStatus(e.error?.message || 'Text generation failed');
+        return;
+      }
+      const data = await res.json();
+      text = data.choices?.[0]?.message?.content?.trim();
     }
-    if (text) setTexts([...texts, { provider, text }]);
+    if (text) setTexts([...texts, { provider, text, prompt }]);
     setStatus('');
   };
 
@@ -102,21 +142,21 @@ export default function App() {
     if (mockMode) {
       const blob = new Blob([txt.text], { type: 'audio/plain' });
       const url = URL.createObjectURL(blob);
-      setAudios([...audios, { index, provider: 'mock', url }]);
+      setAudios([...audios, { index, provider: 'mock', url, prompt: ttsPrompt }]);
       setStatus('');
       return;
     }
     const utter = new SpeechSynthesisUtterance(txt.text);
     speechSynthesis.speak(utter);
     const url = '';
-    setAudios([...audios, { index, provider: 'speechSynthesis', url }]);
+    setAudios([...audios, { index, provider: 'speechSynthesis', url, prompt: ttsPrompt }]);
     setStatus('');
   };
 
   const uploadAudio = (index, file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
-    setAudios([...audios, { index, provider: 'upload', url }]);
+    setAudios([...audios, { index, provider: 'upload', url, prompt: ttsPrompt }]);
   };
 
   const transcribe = async (aIndex) => {
@@ -125,12 +165,12 @@ export default function App() {
     setStatus('Transcribing...');
     if (mockMode) {
       const transcript = texts[audio.index]?.text || '';
-      setTranscripts([...transcripts, { aIndex, provider: 'mock', text: transcript }]);
+      setTranscripts([...transcripts, { aIndex, provider: 'mock', text: transcript, prompt: asrPrompt }]);
       setStatus('');
       return;
     }
     const transcript = texts[audio.index]?.text || '';
-    setTranscripts([...transcripts, { aIndex, provider: 'copy', text: transcript }]);
+    setTranscripts([...transcripts, { aIndex, provider: 'copy', text: transcript, prompt: asrPrompt }]);
     setStatus('');
   };
 
@@ -178,71 +218,116 @@ export default function App() {
   });
 
   return (
-    <div>
-      <h1>Estonian Speech Comparison Tool</h1>
-      <h2>API Keys</h2>
-      <input
-        type="password"
-        placeholder="OpenAI API key"
-        value={apiKeys.openai}
-        onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
-      />
-      <input
-        type="password"
-        placeholder="Google API key"
-        value={apiKeys.google}
-        onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
-      />
-      {mockMode && <p style={{color:'red'}}>Mock mode active: no API key</p>}
-      <h2>Text Generation</h2>
-      <div>
-        <label>
-          Provider
-          <select value={provider} onChange={e => setProvider(e.target.value)}>
-            <option value="openai">OpenAI</option>
-            <option value="google">Google</option>
-          </select>
-        </label>
-        {provider === 'openai' && (
-          <select value={openAiModel} onChange={e => setOpenAiModel(e.target.value)}>
-            {openAiModels.map(m => <option key={m} value={m}>{m}</option>)}
-            {!openAiModels.length && <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>}
-          </select>
-        )}
-        {provider === 'google' && (
-          <select value={googleModel} onChange={e => setGoogleModel(e.target.value)}>
-            {googleModels.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        )}
-        <button onClick={generateText}>Generate Sample Text</button>
-      </div>
-      <div>
-        <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Add custom text" />
-        <button onClick={addText}>Add Text</button>
-      </div>
-      <ul>
-        {texts.map((t, i) => (
-          <li key={i}>
-            <textarea value={t.text} onChange={e => updateText(i, e.target.value)} />
-            <button onClick={() => synthesize(i)}>Synthesize</button>
-            <input type="file" accept="audio/*" onChange={e => uploadAudio(i, e.target.files[0])} />
-          </li>
-        ))}
-      </ul>
-      <h2>Generated Audio</h2>
-      <ul>
-        {audios.map((a, i) => (
-          <li key={i}>
-            Audio {i + 1} from text {a.index + 1}
-            {a.url && <audio controls src={a.url}></audio>}
-            <button onClick={() => transcribe(i)}>Transcribe</button>
-          </li>
-        ))}
-      </ul>
-      <h2>Results</h2>
-      <button onClick={exportJSON}>Export JSON</button>
-      <button onClick={exportCSV}>Export CSV</button>
-      <button onClick={clearData}>Clear Data</button>
+    <>
+      <AppBar position="static">
+        <Toolbar>
+          <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)}>
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6">Estonian Speech Comparison Tool</Typography>
+        </Toolbar>
+      </AppBar>
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <div style={{ width: 250, padding: '1rem' }}>
+          <Typography variant="h6">Configuration</Typography>
+          <TextField
+            label="OpenAI API key"
+            type="password"
+            value={apiKeys.openai}
+            onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Google API key"
+            type="password"
+            value={apiKeys.google}
+            onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          {mockMode && <Typography color="error">Mock mode active: no API key</Typography>}
+          <Typography variant="subtitle1" sx={{ mt: 2 }}>Text Generation</Typography>
+          <Select value={provider} onChange={e => setProvider(e.target.value)} fullWidth>
+            <MenuItem value="openai">OpenAI</MenuItem>
+            <MenuItem value="google">Google</MenuItem>
+          </Select>
+          {provider === 'openai' && (
+            <Select value={openAiModel} onChange={e => setOpenAiModel(e.target.value)} fullWidth margin="normal">
+              {openAiModels.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              {!openAiModels.length && <MenuItem value="gpt-3.5-turbo">gpt-3.5-turbo</MenuItem>}
+            </Select>
+          )}
+          {provider === 'google' && (
+            <Select value={googleModel} onChange={e => setGoogleModel(e.target.value)} fullWidth margin="normal">
+              {googleModels.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+            </Select>
+          )}
+          <TextField
+            label="Generation prompt"
+            multiline
+            rows={3}
+            value={genPrompt}
+            onChange={e => setGenPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="TTS prompt"
+            multiline
+            rows={2}
+            value={ttsPrompt}
+            onChange={e => setTtsPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="ASR prompt"
+            multiline
+            rows={2}
+            value={asrPrompt}
+            onChange={e => setAsrPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+        </div>
+      </Drawer>
+      <div style={{ padding: '1rem' }}>
+        <Button variant="contained" onClick={generateText}>Generate Sample Text</Button>
+        <div style={{ marginTop: '1rem' }}>
+          <TextField
+            multiline
+            fullWidth
+            rows={3}
+            value={newText}
+            onChange={e => setNewText(e.target.value)}
+            placeholder="Add custom text"
+          />
+          <Button variant="outlined" onClick={addText} sx={{ mt: 1 }}>Add Text</Button>
+        </div>
+        <ul>
+          {texts.map((t, i) => (
+            <li key={i}>
+              <TextField multiline fullWidth value={t.text} onChange={e => updateText(i, e.target.value)} />
+              <Button onClick={() => synthesize(i)} sx={{ mt: 1 }}>Synthesize</Button>
+              <input type="file" accept="audio/*" onChange={e => uploadAudio(i, e.target.files[0])} />
+            </li>
+          ))}
+        </ul>
+        <h2>Generated Audio</h2>
+        <ul>
+          {audios.map((a, i) => (
+            <li key={i}>
+              Audio {i + 1} from text {a.index + 1}
+              {a.url && <audio controls src={a.url}></audio>}
+              <Button onClick={() => transcribe(i)}>Transcribe</Button>
+            </li>
+          ))}
+        </ul>
+        <h2>Results</h2>
+        <Button onClick={exportJSON}>Export JSON</Button>
+        <Button onClick={exportCSV}>Export CSV</Button>
+        <Button onClick={clearData}>Clear Data</Button>
       <table>
         <thead>
           <tr><th>#</th><th>Original Text</th><th>Transcription</th><th>WER</th><th>Diff</th></tr>
