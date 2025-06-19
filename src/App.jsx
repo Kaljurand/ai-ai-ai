@@ -346,6 +346,7 @@ export default function App() {
       </table>
       {status && <p>{status}</p>}
     </div>
+    </>
   );
 }
 
