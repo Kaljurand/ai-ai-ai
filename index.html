@@ -13,6 +13,9 @@
     textarea { width: 100%; height: 6rem; }
     table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
     th, td { border: 1px solid #ccc; padding: 0.25rem; }
+    del { background: #fdd; }
+    ins { background: #dfd; text-decoration: none; }
+    canvas.wave { width: 100%; height: 60px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -41,6 +44,61 @@
       return (dp[r.length][h.length] / r.length).toFixed(2);
     }
 
+    // Simple LCS based diff returning HTML strings
+    function diffWords(a, b) {
+      const wa = a.split(/\s+/);
+      const wb = b.split(/\s+/);
+      const m = wa.length, n = wb.length;
+      const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+      for (let i = m - 1; i >= 0; i--) {
+        for (let j = n - 1; j >= 0; j--) {
+          dp[i][j] = wa[i] === wb[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        }
+      }
+      let i = 0, j = 0;
+      const outA = [], outB = [];
+      while (i < m && j < n) {
+        if (wa[i] === wb[j]) {
+          outA.push(wa[i]);
+          outB.push(wb[j]);
+          i++; j++;
+        } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+          outA.push(`<del>${wa[i]}</del>`); i++;
+        } else {
+          outB.push(`<ins>${wb[j]}</ins>`); j++;
+        }
+      }
+      while (i < m) { outA.push(`<del>${wa[i]}</del>`); i++; }
+      while (j < n) { outB.push(`<ins>${wb[j]}</ins>`); j++; }
+      return { a: outA.join(' '), b: outB.join(' ') };
+    }
+
+    // Draw waveform of an audio URL into a canvas element
+    async function drawWaveform(url, canvas) {
+      if (!url || !canvas) return;
+      try {
+        const res = await fetch(url);
+        const buf = await res.arrayBuffer();
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const audio = await ctx.decodeAudioData(buf);
+        const data = audio.getChannelData(0);
+        const step = Math.ceil(data.length / canvas.width);
+        const amp = canvas.height / 2;
+        const c = canvas.getContext('2d');
+        c.clearRect(0, 0, canvas.width, canvas.height);
+        c.fillStyle = '#555';
+        for (let i = 0; i < canvas.width; i++) {
+          let min = 1.0, max = -1.0;
+          for (let j = 0; j < step; j++) {
+            const val = data[(i * step) + j];
+            if (val < min) min = val;
+            if (val > max) max = val;
+          }
+          c.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+        }
+      } catch (e) {}
+    }
+
     // Load/save from localStorage
     function useStoredState(key, initial) {
       const [state, setState] = useState(() => {
@@ -58,71 +116,102 @@
       const [texts, setTexts] = useStoredState('texts', []);
       const [audios, setAudios] = useStoredState('audios', []);
       const [transcripts, setTranscripts] = useStoredState('transcripts', []);
-      const [inputText, setInputText] = useState('');
+      const [genProvider, setGenProvider] = useStoredState('genProvider', 'mock');
+      const [ttsProvider, setTtsProvider] = useStoredState('ttsProvider', 'speechSynthesis');
+      const [asrProvider, setAsrProvider] = useStoredState('asrProvider', 'mock');
+      const [usage, setUsage] = useStoredState('usage', { tokens: 0, cost: 0 });
+      const pricePerToken = 0.002 / 1000; // very rough estimate
 
-      const mockMode = !apiKeys.openai;
+      useEffect(() => {
+        audios.forEach((a, i) => {
+          const canvas = document.getElementById('wave-' + i);
+          if (canvas && a.url) drawWaveform(a.url, canvas);
+        });
+      }, [audios]);
 
       const generateText = async () => {
-        if (mockMode) {
+        if (genProvider === 'openai' && apiKeys.openai) {
+          const prompt = 'Loo keeruline lühike eestikeelne tekst, mis sisaldab numbreid ja lühendeid.';
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKeys.openai}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-3.5-turbo',
+              messages: [{ role: 'user', content: prompt }]
+            })
+          }).then(r => r.json());
+          const text = res.choices?.[0]?.message?.content?.trim();
+          const tokens = res.usage?.total_tokens || 0;
+          if (tokens) setUsage(u => ({ tokens: u.tokens + tokens, cost: u.cost + tokens * pricePerToken }));
+          if (text) setTexts([...texts, { provider: 'openai', text }]);
+        } else {
           const mock = `Näidis lause ${texts.length + 1} numbriga ${Math.floor(Math.random()*100)}`;
           setTexts([...texts, { provider: 'mock', text: mock }]);
-          return;
         }
-        const prompt = 'Loo keeruline lühike eestikeelne tekst, mis sisaldab numbreid ja lühendeid.';
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKeys.openai}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }]
-          })
-        }).then(r => r.json());
-        const text = res.choices?.[0]?.message?.content?.trim();
-        if (text) setTexts([...texts, { provider: 'openai', text }]);
       };
 
       const synthesize = async (index) => {
         const txt = texts[index];
         if (!txt) return;
-        if (mockMode) {
+        if (ttsProvider === 'speechSynthesis') {
+          const utter = new SpeechSynthesisUtterance(txt.text);
+          speechSynthesis.speak(utter);
+          const url = '';
+          setAudios([...audios, { index, provider: 'speechSynthesis', url }]);
+        } else {
           const blob = new Blob([txt.text], { type: 'audio/plain' });
           const url = URL.createObjectURL(blob);
           setAudios([...audios, { index, provider: 'mock', url }]);
-          return;
         }
-        // Fallback to Web Speech API
-        const utter = new SpeechSynthesisUtterance(txt.text);
-        speechSynthesis.speak(utter);
-        const url = '';
-        setAudios([...audios, { index, provider: 'speechSynthesis', url }]);
       };
 
       const transcribe = async (aIndex) => {
         const audio = audios[aIndex];
         if (!audio) return;
-        if (mockMode) {
-          const transcript = texts[audio.index]?.text || '';
-          setTranscripts([...transcripts, { aIndex, provider: 'mock', text: transcript }]);
-          return;
+        const orig = texts[audio.index]?.text || '';
+        let transcript = orig;
+        if (asrProvider === 'reverse') {
+          transcript = orig.split('').reverse().join('');
         }
-        // Real ASR not implemented; fallback copy
-        const transcript = texts[audio.index]?.text || '';
-        setTranscripts([...transcripts, { aIndex, provider: 'copy', text: transcript }]);
+        setTranscripts([...transcripts, { aIndex, provider: asrProvider, text: transcript }]);
       };
 
       const rows = transcripts.map((t, i) => {
         const audio = audios[t.aIndex];
         const txt = texts[audio.index];
         const wer = wordErrorRate(txt.text, t.text);
-        return { i: i + 1, original: txt.text, transcription: t.text, wer };
+        const diff = diffWords(txt.text, t.text);
+        return { i: i + 1, original: txt.text, transcription: t.text, wer, diff };
       });
 
       return (
         <div>
           <h1>Estonian Speech Comparison Tool</h1>
+          <p>Tokens used: {usage.tokens} | Cost ~ ${usage.cost.toFixed(4)} <button onClick={() => setUsage({tokens:0,cost:0})}>Reset</button></p>
+          <h2>Providers</h2>
+          <label>Generation:
+            <select value={genProvider} onChange={e=>setGenProvider(e.target.value)}>
+              <option value="mock">Mock</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </label>
+          <br/>
+          <label>TTS:
+            <select value={ttsProvider} onChange={e=>setTtsProvider(e.target.value)}>
+              <option value="speechSynthesis">SpeechSynthesis</option>
+              <option value="mock">Mock</option>
+            </select>
+          </label>
+          <br/>
+          <label>ASR:
+            <select value={asrProvider} onChange={e=>setAsrProvider(e.target.value)}>
+              <option value="mock">Copy</option>
+              <option value="reverse">Reverse</option>
+            </select>
+          </label>
           <h2>API Key</h2>
           <input
             type="password"
@@ -130,7 +219,7 @@
             value={apiKeys.openai}
             onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
           />
-          {mockMode && <p style={{color:'red'}}>Mock mode active: no API key</p>}
+          {genProvider === 'openai' && !apiKeys.openai && <p style={{color:'red'}}>OpenAI key required</p>}
           <h2>Text Generation</h2>
           <button onClick={generateText}>Generate Sample Text</button>
           <ul>
@@ -144,6 +233,7 @@
               <li key={i}>
                 Audio {i + 1} from text {a.index + 1}
                 {a.url && <audio controls src={a.url}></audio>}
+                {a.url && <canvas id={`wave-${i}`} className="wave"></canvas>}
                 <button onClick={() => transcribe(i)}>Transcribe</button>
               </li>
             ))}
@@ -151,7 +241,7 @@
           <h2>Results</h2>
           <table>
             <thead>
-              <tr><th>#</th><th>Original Text</th><th>Transcription</th><th>WER</th></tr>
+              <tr><th>#</th><th>Original Text</th><th>Transcription</th><th>WER</th><th>Diff</th></tr>
             </thead>
             <tbody>
               {rows.map(r => (
@@ -160,6 +250,9 @@
                   <td>{r.original}</td>
                   <td>{r.transcription}</td>
                   <td>{r.wer}</td>
+                  <td>
+                    <div dangerouslySetInnerHTML={{__html: r.diff.b}}></div>
+                  </td>
                 </tr>
               ))}
             </tbody>
