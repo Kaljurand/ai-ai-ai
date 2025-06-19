@@ -27,6 +27,9 @@ npm test
 - Synthesize text to audio using the browser Speech Synthesis API (or mock blobs).
 - Transcribe audio back to text (mock mode copies the original text).
 - Compute the Word Error Rate (WER) between the generated text and transcription.
+- Visual diff view highlighting transcription errors.
+- Users can add their own texts, edit generated ones and upload audio files.
+- Export results as JSON or CSV and clear all stored data.
 - Results are persisted in browser local storage.
 
 This is not a production-ready system but demonstrates the flow described in the specification.
