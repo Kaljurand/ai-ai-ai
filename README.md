@@ -30,7 +30,7 @@ npm test
 - Generate Estonian texts via OpenAI or Google APIs. A built‑in mock mode is used when no API keys are provided.
 - API keys and available models for each provider can be entered in the UI. Model lists are fetched from the APIs.
 - Synthesize text to audio using the browser Speech Synthesis API (or mock blobs).
-- Transcribe audio back to text (mock mode copies the original text).
+- Transcribe audio back to text. In mock mode the app tries to use the browser's built‑in speech recognition service and falls back to a randomised transcript when unavailable.
 - Compute the Word Error Rate (WER) between the generated text and transcription.
 - Visual diff view highlighting transcription errors.
 - Users can add their own texts, edit generated ones and upload audio files.

@@ -25,6 +25,31 @@ function useStoredState(key, initial) {
   return [state, setState];
 }
 
+function makeLongMockText(index) {
+  const num = Math.floor(Math.random() * 100);
+  return `Näidis pikem tekst ${index} sisaldab mitut lauset ja juhusliku numbri ${num}. ` +
+    'Teine lause venitab kasutajaliidese paigutust ning kontrollib komade ja lühendite lk kasutamist. ' +
+    'Kolmas lause lisab keerukama sõna nagu õunaaed ja muudab teksti mitmekesiseks.';
+}
+
+function makeMockTranscription(text) {
+  const words = text.split(/\s+/);
+  const out = [];
+  for (const w of words) {
+    const r = Math.random();
+    if (r < 0.1) continue; // drop word
+    let word = w;
+    if (r >= 0.1 && r < 0.2) {
+      const idx = Math.floor(Math.random() * w.length);
+      const ch = String.fromCharCode(97 + Math.floor(Math.random() * 26));
+      word = w.slice(0, idx) + ch + w.slice(idx + 1);
+    }
+    out.push(word);
+    if (r >= 0.2 && r < 0.3) out.push('ja');
+  }
+  return out.join(' ');
+}
+
 export default function App() {
   const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
   const [texts, setTexts] = useStoredState('texts', []);
@@ -91,7 +116,7 @@ export default function App() {
   const generateText = async () => {
     setStatus('Generating text...');
     if (mockMode) {
-      const mock = `Näidis lause ${texts.length + 1} numbriga ${Math.floor(Math.random()*100)}`;
+      const mock = makeLongMockText(texts.length + 1);
       setTexts([...texts, { provider: 'mock', text: mock }]);
       setStatus('');
       return;
@@ -163,15 +188,36 @@ export default function App() {
     const audio = audios[aIndex];
     if (!audio) return;
     setStatus('Transcribing...');
-    if (mockMode) {
-      const transcript = texts[audio.index]?.text || '';
-      setTranscripts([...transcripts, { aIndex, provider: 'mock', text: transcript, prompt: asrPrompt }]);
+    const finish = (text, provider) => {
+      setTranscripts([...transcripts, { aIndex, provider, text, prompt: asrPrompt }]);
       setStatus('');
+    };
+    if (mockMode) {
+      const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+      if (SR) {
+        try {
+          const recognition = new SR();
+          recognition.lang = 'et-EE';
+          recognition.onresult = e => {
+            const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
+            finish(text, 'browser-asr');
+          };
+          recognition.onerror = () => finish(makeMockTranscription(texts[audio.index]?.text || ''), 'mock');
+          recognition.start();
+          if (audio.url) {
+            new Audio(audio.url).play();
+          }
+          return;
+        } catch {
+          // ignore and fallback
+        }
+      }
+      const text = makeMockTranscription(texts[audio.index]?.text || '');
+      finish(text, 'mock');
       return;
     }
     const transcript = texts[audio.index]?.text || '';
-    setTranscripts([...transcripts, { aIndex, provider: 'copy', text: transcript, prompt: asrPrompt }]);
-    setStatus('');
+    finish(transcript, 'copy');
   };
 
   const updateText = (index, text) => {
