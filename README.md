@@ -2,7 +2,24 @@
 
 This repository contains a small proof-of-concept single page application for comparing Estonian text generation, text-to-speech (TTS) and automatic speech recognition (ASR) providers.
 
-Open `index.html` in a browser to run the tool. The application is implemented entirely in the browser using React.
+The app now uses a small Vite build setup. Install dependencies and run the development server with:
+
+```bash
+npm install
+npm run dev
+```
+
+Build static files with:
+
+```bash
+npm run build
+```
+
+To execute the unit tests run:
+
+```bash
+npm test
+```
 
 ## Features
 
