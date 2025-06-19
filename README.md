@@ -15,6 +15,10 @@ Build static files with:
 npm run build
 ```
 
+This generates production files in the `dist` directory. Open
+`dist/index.html` in your browser to use the app without running the
+development server.
+
 To execute the unit tests run:
 
 ```bash
