@@ -14,14 +14,51 @@ function useStoredState(key, initial) {
 }
 
 export default function App() {
-  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '' });
+  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
   const [texts, setTexts] = useStoredState('texts', []);
   const [audios, setAudios] = useStoredState('audios', []);
   const [transcripts, setTranscripts] = useStoredState('transcripts', []);
   const [newText, setNewText] = useState('');
   const [status, setStatus] = useState('');
+  const [provider, setProvider] = useStoredState('provider', 'openai');
+  const [openAiModels, setOpenAiModels] = useState([]);
+  const [googleModels, setGoogleModels] = useState([]);
+  const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
+  const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
 
-  const mockMode = !apiKeys.openai;
+  const mockMode = !apiKeys.openai && !apiKeys.google;
+
+  useEffect(() => {
+    if (!apiKeys.openai) return;
+    fetch('https://api.openai.com/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${apiKeys.openai}`
+      }
+    })
+      .then(r => r.json())
+      .then(data => {
+        const models = data.data?.map(m => m.id).sort();
+        if (models?.length) {
+          setOpenAiModels(models);
+          if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
+        }
+      })
+      .catch(() => {});
+  }, [apiKeys.openai]);
+
+  useEffect(() => {
+    if (!apiKeys.google) return;
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`)
+      .then(r => r.json())
+      .then(data => {
+        const models = data.models?.map(m => m.name);
+        if (models?.length) {
+          setGoogleModels(models);
+          if (!models.includes(googleModel)) setGoogleModel(models[0]);
+        }
+      })
+      .catch(() => {});
+  }, [apiKeys.google]);
 
   const generateText = async () => {
     setStatus('Generating text...');
@@ -32,19 +69,29 @@ export default function App() {
       return;
     }
     const prompt = 'Loo keeruline lühike eestikeelne tekst, mis sisaldab numbreid ja lühendeid.';
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKeys.openai}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    }).then(r => r.json());
-    const text = res.choices?.[0]?.message?.content?.trim();
-    if (text) setTexts([...texts, { provider: 'openai', text }]);
+    let text = '';
+    if (provider === 'google') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: { text: prompt } })
+      }).then(r => r.json());
+      text = res.candidates?.[0]?.output?.trim();
+    } else {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKeys.openai}`
+        },
+        body: JSON.stringify({
+          model: openAiModel,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      }).then(r => r.json());
+      text = res.choices?.[0]?.message?.content?.trim();
+    }
+    if (text) setTexts([...texts, { provider, text }]);
     setStatus('');
   };
 
@@ -133,16 +180,42 @@ export default function App() {
   return (
     <div>
       <h1>Estonian Speech Comparison Tool</h1>
-      <h2>API Key</h2>
+      <h2>API Keys</h2>
       <input
         type="password"
         placeholder="OpenAI API key"
         value={apiKeys.openai}
         onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
       />
+      <input
+        type="password"
+        placeholder="Google API key"
+        value={apiKeys.google}
+        onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
+      />
       {mockMode && <p style={{color:'red'}}>Mock mode active: no API key</p>}
       <h2>Text Generation</h2>
-      <button onClick={generateText}>Generate Sample Text</button>
+      <div>
+        <label>
+          Provider
+          <select value={provider} onChange={e => setProvider(e.target.value)}>
+            <option value="openai">OpenAI</option>
+            <option value="google">Google</option>
+          </select>
+        </label>
+        {provider === 'openai' && (
+          <select value={openAiModel} onChange={e => setOpenAiModel(e.target.value)}>
+            {openAiModels.map(m => <option key={m} value={m}>{m}</option>)}
+            {!openAiModels.length && <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>}
+          </select>
+        )}
+        {provider === 'google' && (
+          <select value={googleModel} onChange={e => setGoogleModel(e.target.value)}>
+            {googleModels.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        )}
+        <button onClick={generateText}>Generate Sample Text</button>
+      </div>
       <div>
         <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Add custom text" />
         <button onClick={addText}>Add Text</button>
