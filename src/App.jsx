@@ -11,6 +11,10 @@ import {
   AppBar,
   Toolbar,
   Typography,
+  Tabs,
+  Tab,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 
@@ -66,6 +70,17 @@ export default function App() {
   const [genPrompt, setGenPrompt] = useStoredState('genPrompt', 'Generate a realistic Estonian weather report');
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
+
+  const [view, setView] = useState('audio');
+  const ttsModels = [
+    { id: 'slow', name: 'Slow TTS', cost: '0.005€/s' },
+    { id: 'fast', name: 'Fast TTS', cost: '0.010€/s' },
+  ];
+  const [selectedTtsModels, setSelectedTtsModels] = useState([ttsModels[0].id]);
+  const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
+  const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
+  const [recording, setRecording] = useState(false);
+  const [recorder, setRecorder] = useState(null);
 
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
@@ -181,7 +196,86 @@ export default function App() {
   const uploadAudio = (index, file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
-    setAudios([...audios, { index, provider: 'upload', url, prompt: ttsPrompt }]);
+    const idx = texts.length;
+    setTexts([...texts, { provider: 'upload', text: `Uploaded audio ${idx + 1}` }]);
+    setAudios([...audios, { index: idx, provider: 'upload', url, prompt: ttsPrompt }]);
+  };
+
+  const startRecording = async () => {
+    if (recording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      rec.ondataavailable = e => {
+        const url = URL.createObjectURL(e.data);
+        const idx = texts.length;
+        setTexts([...texts, { provider: 'record', text: `Recorded audio ${idx + 1}` }]);
+        setAudios(a => [...a, { index: idx, provider: 'record', url, prompt: ttsPrompt }]);
+      };
+      rec.start();
+      setRecorder(rec);
+      setRecording(true);
+    } catch {
+      setStatus('Recording not available');
+    }
+  };
+
+  const stopRecording = () => {
+    if (recorder) {
+      recorder.stop();
+      setRecording(false);
+    }
+  };
+
+  const generateTtsText = async () => {
+    setStatus('Generating prompt...');
+    if (mockMode) {
+      setTtsPrompt('Tere, see on genereeritud kõne.');
+      setStatus('');
+      return;
+    }
+    const prompt = ttsGenPrompt;
+    let text = '';
+    if (provider === 'google') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: { text: prompt } })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        text = data.candidates?.[0]?.output?.trim();
+      }
+    } else {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
+        body: JSON.stringify({ model: openAiModel, messages: [{ role: 'user', content: prompt }] })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        text = data.choices?.[0]?.message?.content?.trim();
+      }
+    }
+    if (text) setTtsPrompt(text);
+    setStatus('');
+  };
+
+  const synthesizeTts = async () => {
+    const idx = texts.length;
+    setTexts([...texts, { provider: 'tts', text: ttsPrompt }]);
+    for (const model of selectedTtsModels) {
+      if (mockMode) {
+        const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
+        const url = URL.createObjectURL(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt }]);
+      } else {
+        // Replace with real TTS server call
+        const blob = new Blob([`${model}:${ttsPrompt}`], { type: 'audio/plain' });
+        const url = URL.createObjectURL(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt }]);
+      }
+    }
   };
 
   const transcribe = async (aIndex) => {
@@ -270,7 +364,11 @@ export default function App() {
           <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)}>
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6">Estonian Speech Comparison Tool</Typography>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>Estonian Speech Comparison Tool</Typography>
+          <Tabs value={view} onChange={(e, v) => setView(v)} textColor="inherit" indicatorColor="secondary">
+            <Tab value="audio" label="Audio Generation" />
+            <Tab value="results" label="Results" />
+          </Tabs>
         </Toolbar>
       </AppBar>
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
@@ -338,60 +436,69 @@ export default function App() {
           />
         </div>
       </Drawer>
-      <div style={{ padding: '1rem' }}>
-        <Button variant="contained" onClick={generateText}>Generate Sample Text</Button>
-        <div style={{ marginTop: '1rem' }}>
-          <TextField
-            multiline
-            fullWidth
-            rows={3}
-            value={newText}
-            onChange={e => setNewText(e.target.value)}
-            placeholder="Add custom text"
-          />
-          <Button variant="outlined" onClick={addText} sx={{ mt: 1 }}>Add Text</Button>
+      {view === 'audio' && (
+        <div style={{ padding: '1rem' }}>
+          <FormControlLabel control={<Checkbox checked={generateTtsPrompt} onChange={e => setGenerateTtsPrompt(e.target.checked)} />} label="Generate the TTS prompt" />
+          {generateTtsPrompt && (
+            <>
+              <Select value={provider} onChange={e => setProvider(e.target.value)} fullWidth>
+                <MenuItem value="openai">OpenAI</MenuItem>
+                <MenuItem value="google">Google</MenuItem>
+              </Select>
+              <TextField label="Prompt for text generator" multiline rows={3} value={ttsGenPrompt} onChange={e => setTtsGenPrompt(e.target.value)} fullWidth margin="normal" />
+              <Button onClick={generateTtsText}>Generate Prompt</Button>
+            </>
+          )}
+          <TextField label="TTS prompt" multiline rows={3} value={ttsPrompt} onChange={e => setTtsPrompt(e.target.value)} fullWidth margin="normal" />
+          <Select multiple value={selectedTtsModels} onChange={e => setSelectedTtsModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
+            {ttsModels.map(m => (
+              <MenuItem key={m.id} value={m.id}>{`${m.name} (${m.cost})`}</MenuItem>
+            ))}
+          </Select>
+          <Button variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>Generate Audio</Button>
+          <Button component="label" sx={{ mt: 1, ml: 1 }}>
+            Upload Audio
+            <input type="file" accept="audio/*" hidden onChange={e => uploadAudio(texts.length, e.target.files[0])} />
+          </Button>
+          <Button onClick={recording ? stopRecording : startRecording} sx={{ mt: 1, ml: 1 }}>
+            {recording ? 'Stop Recording' : 'Record Audio'}
+          </Button>
+          <ul>
+            {audios.map((a, i) => (
+              <li key={i}>
+                Audio {i + 1} ({a.provider})
+                {a.url && <audio controls src={a.url}></audio>}
+                <Button onClick={() => transcribe(i)}>Transcribe</Button>
+              </li>
+            ))}
+          </ul>
+          {status && <p>{status}</p>}
         </div>
-        <ul>
-          {texts.map((t, i) => (
-            <li key={i}>
-              <TextField multiline fullWidth value={t.text} onChange={e => updateText(i, e.target.value)} />
-              <Button onClick={() => synthesize(i)} sx={{ mt: 1 }}>Synthesize</Button>
-              <input type="file" accept="audio/*" onChange={e => uploadAudio(i, e.target.files[0])} />
-            </li>
-          ))}
-        </ul>
-        <h2>Generated Audio</h2>
-        <ul>
-          {audios.map((a, i) => (
-            <li key={i}>
-              Audio {i + 1} from text {a.index + 1}
-              {a.url && <audio controls src={a.url}></audio>}
-              <Button onClick={() => transcribe(i)}>Transcribe</Button>
-            </li>
-          ))}
-        </ul>
-        <h2>Results</h2>
-        <Button onClick={exportJSON}>Export JSON</Button>
-        <Button onClick={exportCSV}>Export CSV</Button>
-        <Button onClick={clearData}>Clear Data</Button>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Original Text</th><th>Transcription</th><th>WER</th><th>Diff</th></tr>
-        </thead>
-        <tbody>
-          {rows.map(r => (
-            <tr key={r.i}>
-              <td>{r.i}</td>
-              <td>{r.original}</td>
-              <td>{r.transcription}</td>
-              <td>{r.wer}</td>
-              <td dangerouslySetInnerHTML={{__html:r.diff}}></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {status && <p>{status}</p>}
-    </div>
+      )}
+      {view === 'results' && (
+        <div style={{ padding: '1rem' }}>
+          <Button onClick={exportJSON}>Export JSON</Button>
+          <Button onClick={exportCSV}>Export CSV</Button>
+          <Button onClick={clearData}>Clear Data</Button>
+          <table>
+            <thead>
+              <tr><th>#</th><th>Original Text</th><th>Transcription</th><th>WER</th><th>Diff</th></tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.i}>
+                  <td>{r.i}</td>
+                  <td>{r.original}</td>
+                  <td>{r.transcription}</td>
+                  <td>{r.wer}</td>
+                  <td dangerouslySetInnerHTML={{__html:r.diff}}></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {status && <p>{status}</p>}
+        </div>
+      )}
     </>
   );
 }
