@@ -15,6 +15,10 @@ import {
   Tab,
   Checkbox,
   FormControlLabel,
+  Snackbar,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 
@@ -81,6 +85,13 @@ export default function App() {
   const [recorder, setRecorder] = useState(null);
   const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
   const [resultSort, setResultSort] = useState({ column: 'i', asc: true });
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const predefinedPrompts = [
+    'Write a 4-turn dialogue in Estonian between two speakers discussing the weather. The dialogue should include specific temperatures, wind speeds, dates, times, and common weather-related abbreviations (like °C, km/h, EMHI, jne.). The tone should be natural but information-dense.',
+    'Generate a short news style weather update for Tallinn including temperatures and wind information.',
+    'Create a friendly conversation about weekend plans in Estonian.'
+  ];
 
   useEffect(() => {
     if (ttsModels.length && !selectedTtsModels.length) {
@@ -114,6 +125,10 @@ export default function App() {
     setResultSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
   };
 
+  const showError = msg => {
+    setErrorMsg(msg);
+  };
+
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
   useEffect(() => {
@@ -142,7 +157,7 @@ export default function App() {
           if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
         }
       })
-      .catch(e => setStatus(e.message));
+      .catch(e => showError(e.message));
   }, [apiKeys.openai]);
 
   useEffect(() => {
@@ -172,7 +187,7 @@ export default function App() {
           if (!models.includes(googleModel)) setGoogleModel(models[0]);
         }
       })
-      .catch(e => setStatus(e.message));
+      .catch(e => showError(e.message));
   }, [apiKeys.google]);
 
   useEffect(() => {
@@ -192,7 +207,7 @@ export default function App() {
           if (!selectedTtsModels.length) setSelectedTtsModels([voices[0].id]);
         }
       })
-      .catch(e => setStatus(e.message));
+      .catch(e => showError(e.message));
   }, [apiKeys.google]);
 
   const generateText = async () => {
@@ -213,7 +228,8 @@ export default function App() {
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        setStatus(e.error?.message || 'Text generation failed');
+        showError(e.error?.message || 'Text generation failed');
+        setStatus('');
         return;
       }
       const data = await res.json();
@@ -232,7 +248,8 @@ export default function App() {
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        setStatus(e.error?.message || 'Text generation failed');
+        showError(e.error?.message || 'Text generation failed');
+        setStatus('');
         return;
       }
       const data = await res.json();
@@ -289,26 +306,34 @@ export default function App() {
     const prompt = ttsGenPrompt;
     let text = '';
     const modelInfo = ttsGenModelsList.find(m => m.id === ttsGenModel);
-    if (modelInfo?.provider === 'google') {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: { text: prompt } })
-      });
-      if (res.ok) {
+    try {
+      if (modelInfo?.provider === 'google') {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: { text: prompt } })
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.error?.message || 'Failed to generate prompt');
+        }
         const data = await res.json();
         text = data.candidates?.[0]?.output?.trim();
-      }
-    } else if (modelInfo?.provider === 'openai') {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
-        body: JSON.stringify({ model: ttsGenModel, messages: [{ role: 'user', content: prompt }] })
-      });
-      if (res.ok) {
+      } else if (modelInfo?.provider === 'openai') {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
+          body: JSON.stringify({ model: ttsGenModel, messages: [{ role: 'user', content: prompt }] })
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.error?.message || 'Failed to generate prompt');
+        }
         const data = await res.json();
         text = data.choices?.[0]?.message?.content?.trim();
       }
+    } catch (e) {
+      showError(e.message);
     }
     if (text) setTtsPrompt(text);
     setStatus('');
@@ -438,6 +463,7 @@ export default function App() {
           <Tabs value={view} onChange={(e, v) => setView(v)} textColor="inherit" indicatorColor="secondary">
             <Tab value="audio" label="Audio Generation" />
             <Tab value="results" label="Results" />
+            <Tab value="prompts" label="Prompts" />
           </Tabs>
         </Toolbar>
       </AppBar>
@@ -592,6 +618,19 @@ export default function App() {
           {status && <p>{status}</p>}
         </div>
       )}
+      {view === 'prompts' && (
+        <div style={{ padding: '1rem' }}>
+          <Typography variant="h6" sx={{ mb: 1 }}>Predefined Prompts</Typography>
+          <List>
+            {predefinedPrompts.map((p, i) => (
+              <ListItem button key={i} onClick={() => { setTtsGenPrompt(p); setView('audio'); setGenerateTtsPrompt(true); }}>
+                <ListItemText primary={p} />
+              </ListItem>
+            ))}
+          </List>
+        </div>
+      )}
+      <Snackbar open={!!errorMsg} message={errorMsg} onClose={() => setErrorMsg('')} autoHideDuration={6000} />
     </>
   );
 }
