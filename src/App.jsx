@@ -76,14 +76,43 @@ export default function App() {
   const [selectedTtsModels, setSelectedTtsModels] = useState([]);
   const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
   const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
+  const [ttsGenModel, setTtsGenModel] = useState('');
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
+  const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
+  const [resultSort, setResultSort] = useState({ column: 'i', asc: true });
 
   useEffect(() => {
     if (ttsModels.length && !selectedTtsModels.length) {
       setSelectedTtsModels([ttsModels[0].id]);
     }
   }, [ttsModels]);
+
+  const ttsGenModelsList = [
+    ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
+    ...googleModels.map(m => ({ id: m, provider: 'google' }))
+  ];
+
+  const sortItems = (items, { column, asc }) => {
+    const withIndex = items.map((it, i) => ({ ...it, _index: i }));
+    const sorted = withIndex.sort((a, b) => {
+      const av = a[column];
+      const bv = b[column];
+      if (typeof av === 'number' && typeof bv === 'number') return av - bv;
+      if (Date.parse(av) && Date.parse(bv)) return new Date(av) - new Date(bv);
+      return String(av).localeCompare(String(bv));
+    });
+    const res = asc ? sorted : sorted.reverse();
+    return res;
+  };
+
+  const handleAudioSort = col => {
+    setAudioSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
+  };
+
+  const handleResultSort = col => {
+    setResultSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
+  };
 
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
@@ -115,6 +144,16 @@ export default function App() {
       })
       .catch(e => setStatus(e.message));
   }, [apiKeys.openai]);
+
+  useEffect(() => {
+    const all = [
+      ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
+      ...googleModels.map(m => ({ id: m, provider: 'google' }))
+    ];
+    if (!ttsGenModel && all.length) {
+      setTtsGenModel(all[0].id);
+    }
+  }, [openAiModels, googleModels]);
 
   useEffect(() => {
     if (!apiKeys.google) return;
@@ -249,8 +288,9 @@ export default function App() {
     }
     const prompt = ttsGenPrompt;
     let text = '';
-    if (provider === 'google') {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`, {
+    const modelInfo = ttsGenModelsList.find(m => m.id === ttsGenModel);
+    if (modelInfo?.provider === 'google') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: { text: prompt } })
@@ -259,11 +299,11 @@ export default function App() {
         const data = await res.json();
         text = data.candidates?.[0]?.output?.trim();
       }
-    } else {
+    } else if (modelInfo?.provider === 'openai') {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
-        body: JSON.stringify({ model: openAiModel, messages: [{ role: 'user', content: prompt }] })
+        body: JSON.stringify({ model: ttsGenModel, messages: [{ role: 'user', content: prompt }] })
       });
       if (res.ok) {
         const data = await res.json();
@@ -328,6 +368,19 @@ export default function App() {
     finish(transcript, 'copy');
   };
 
+  const deleteAudio = (aIndex) => {
+    setAudios(a => a.filter((_, i) => i !== aIndex));
+    setTranscripts(t => t.flatMap(tr => {
+      if (tr.aIndex === aIndex) return [];
+      if (tr.aIndex > aIndex) return [{ ...tr, aIndex: tr.aIndex - 1 }];
+      return [tr];
+    }));
+  };
+
+  const deleteTranscript = (tIndex) => {
+    setTranscripts(t => t.filter((_, i) => i !== tIndex));
+  };
+
   const updateText = (index, text) => {
     setTexts(texts.map((t, i) => (i === index ? { ...t, text } : t)));
   };
@@ -370,6 +423,9 @@ export default function App() {
     const diff = diffWordsHtml(txt.text, t.text);
     return { i: i + 1, original: txt.text, transcription: t.text, wer, diff };
   });
+
+  const sortedAudios = sortItems(audios, audioSort);
+  const sortedRows = sortItems(rows, resultSort);
 
   return (
     <>
@@ -455,9 +511,10 @@ export default function App() {
           <FormControlLabel control={<Checkbox checked={generateTtsPrompt} onChange={e => setGenerateTtsPrompt(e.target.checked)} />} label="Generate the TTS prompt" />
           {generateTtsPrompt && (
             <>
-              <Select value={provider} onChange={e => setProvider(e.target.value)} fullWidth>
-                <MenuItem value="openai">OpenAI</MenuItem>
-                <MenuItem value="google">Google</MenuItem>
+              <Select value={ttsGenModel} onChange={e => setTtsGenModel(e.target.value)} fullWidth>
+                {ttsGenModelsList.map(m => (
+                  <MenuItem key={m.id} value={m.id}>{`${m.id} (${m.provider})`}</MenuItem>
+                ))}
               </Select>
               <TextField label="Prompt for text generator" multiline rows={3} value={ttsGenPrompt} onChange={e => setTtsGenPrompt(e.target.value)} fullWidth margin="normal" />
               <Button onClick={generateTtsText}>Generate Prompt</Button>
@@ -479,15 +536,23 @@ export default function App() {
           </Button>
           <table style={{ width: '100%', marginTop: '1rem' }}>
             <thead>
-              <tr><th>Time</th><th>Provider</th><th>Audio</th><th></th></tr>
+              <tr>
+                <th onClick={() => handleAudioSort('timestamp')}>Time</th>
+                <th onClick={() => handleAudioSort('provider')}>Provider</th>
+                <th>Audio</th>
+                <th>Actions</th>
+              </tr>
             </thead>
             <tbody>
-              {audios.map((a, i) => (
+              {sortedAudios.map((a, i) => (
                 <tr key={i}>
                   <td>{a.timestamp}</td>
                   <td>{a.provider}</td>
                   <td>{a.url && <audio controls src={a.url}></audio>}</td>
-                  <td><Button onClick={() => transcribe(i)}>Transcribe</Button></td>
+                  <td>
+                    <Button onClick={() => transcribe(a._index)}>Transcribe</Button>
+                    <Button onClick={() => deleteAudio(a._index)} color="error" sx={{ ml: 1 }}>Delete</Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -502,16 +567,24 @@ export default function App() {
           <Button onClick={clearData}>Clear Data</Button>
           <table>
             <thead>
-              <tr><th>#</th><th>Original Text</th><th>Transcription</th><th>WER</th><th>Diff</th></tr>
+              <tr>
+                <th onClick={() => handleResultSort('i')}>#</th>
+                <th onClick={() => handleResultSort('original')}>Original Text</th>
+                <th onClick={() => handleResultSort('transcription')}>Transcription</th>
+                <th onClick={() => handleResultSort('wer')}>WER</th>
+                <th>Diff</th>
+                <th>Actions</th>
+              </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
-                <tr key={r.i}>
+              {sortedRows.map((r, idx) => (
+                <tr key={idx}>
                   <td>{r.i}</td>
                   <td>{r.original}</td>
                   <td>{r.transcription}</td>
                   <td>{r.wer}</td>
                   <td dangerouslySetInnerHTML={{__html:r.diff}}></td>
+                  <td><Button onClick={() => deleteTranscript(idx)} color="error">Delete</Button></td>
                 </tr>
               ))}
             </tbody>
