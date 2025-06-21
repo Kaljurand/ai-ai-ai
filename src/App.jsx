@@ -72,15 +72,18 @@ export default function App() {
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
 
   const [view, setView] = useState('audio');
-  const ttsModels = [
-    { id: 'slow', name: 'Slow TTS', cost: '0.005€/s' },
-    { id: 'fast', name: 'Fast TTS', cost: '0.010€/s' },
-  ];
-  const [selectedTtsModels, setSelectedTtsModels] = useState([ttsModels[0].id]);
+  const [ttsModels, setTtsModels] = useState([]);
+  const [selectedTtsModels, setSelectedTtsModels] = useState([]);
   const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
   const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
+
+  useEffect(() => {
+    if (ttsModels.length && !selectedTtsModels.length) {
+      setSelectedTtsModels([ttsModels[0].id]);
+    }
+  }, [ttsModels]);
 
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
@@ -104,6 +107,11 @@ export default function App() {
           setOpenAiModels(models);
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
+        const tts = data.data?.filter(m => m.id.startsWith('tts-')).map(m => ({ id: m.id, name: m.id, cost: '' }));
+        if (tts?.length) {
+          setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-')), ...tts]);
+          if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
+        }
       })
       .catch(e => setStatus(e.message));
   }, [apiKeys.openai]);
@@ -123,6 +131,26 @@ export default function App() {
         if (models?.length) {
           setGoogleModels(models);
           if (!models.includes(googleModel)) setGoogleModel(models[0]);
+        }
+      })
+      .catch(e => setStatus(e.message));
+  }, [apiKeys.google]);
+
+  useEffect(() => {
+    if (!apiKeys.google) return;
+    fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`)
+      .then(async r => {
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.error?.message || 'Failed to fetch Google voices');
+        }
+        return r.json();
+      })
+      .then(data => {
+        const voices = data.voices?.map(v => ({ id: v.name, name: v.name, cost: '' }));
+        if (voices?.length) {
+          setTtsModels(t => [...t.filter(x => !x.id.startsWith('projects/')), ...voices]);
+          if (!selectedTtsModels.length) setSelectedTtsModels([voices[0].id]);
         }
       })
       .catch(e => setStatus(e.message));
@@ -175,30 +203,14 @@ export default function App() {
     setStatus('');
   };
 
-  const synthesize = async (index) => {
-    const txt = texts[index];
-    if (!txt) return;
-    setStatus('Synthesizing...');
-    if (mockMode) {
-      const blob = new Blob([txt.text], { type: 'audio/plain' });
-      const url = URL.createObjectURL(blob);
-      setAudios([...audios, { index, provider: 'mock', url, prompt: ttsPrompt }]);
-      setStatus('');
-      return;
-    }
-    const utter = new SpeechSynthesisUtterance(txt.text);
-    speechSynthesis.speak(utter);
-    const url = '';
-    setAudios([...audios, { index, provider: 'speechSynthesis', url, prompt: ttsPrompt }]);
-    setStatus('');
-  };
 
   const uploadAudio = (index, file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
     const idx = texts.length;
+    const timestamp = new Date().toISOString();
     setTexts([...texts, { provider: 'upload', text: `Uploaded audio ${idx + 1}` }]);
-    setAudios([...audios, { index: idx, provider: 'upload', url, prompt: ttsPrompt }]);
+    setAudios([...audios, { index: idx, provider: 'upload', url, prompt: ttsPrompt, timestamp }]);
   };
 
   const startRecording = async () => {
@@ -209,8 +221,9 @@ export default function App() {
       rec.ondataavailable = e => {
         const url = URL.createObjectURL(e.data);
         const idx = texts.length;
+        const timestamp = new Date().toISOString();
         setTexts([...texts, { provider: 'record', text: `Recorded audio ${idx + 1}` }]);
-        setAudios(a => [...a, { index: idx, provider: 'record', url, prompt: ttsPrompt }]);
+        setAudios(a => [...a, { index: idx, provider: 'record', url, prompt: ttsPrompt, timestamp }]);
       };
       rec.start();
       setRecorder(rec);
@@ -263,17 +276,18 @@ export default function App() {
 
   const synthesizeTts = async () => {
     const idx = texts.length;
+    const timestamp = new Date().toISOString();
     setTexts([...texts, { provider: 'tts', text: ttsPrompt }]);
     for (const model of selectedTtsModels) {
       if (mockMode) {
         const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
         const url = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt }]);
+        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
       } else {
         // Replace with real TTS server call
         const blob = new Blob([`${model}:${ttsPrompt}`], { type: 'audio/plain' });
         const url = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt }]);
+        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
       }
     }
   };
@@ -463,15 +477,21 @@ export default function App() {
           <Button onClick={recording ? stopRecording : startRecording} sx={{ mt: 1, ml: 1 }}>
             {recording ? 'Stop Recording' : 'Record Audio'}
           </Button>
-          <ul>
-            {audios.map((a, i) => (
-              <li key={i}>
-                Audio {i + 1} ({a.provider})
-                {a.url && <audio controls src={a.url}></audio>}
-                <Button onClick={() => transcribe(i)}>Transcribe</Button>
-              </li>
-            ))}
-          </ul>
+          <table style={{ width: '100%', marginTop: '1rem' }}>
+            <thead>
+              <tr><th>Time</th><th>Provider</th><th>Audio</th><th></th></tr>
+            </thead>
+            <tbody>
+              {audios.map((a, i) => (
+                <tr key={i}>
+                  <td>{a.timestamp}</td>
+                  <td>{a.provider}</td>
+                  <td>{a.url && <audio controls src={a.url}></audio>}</td>
+                  <td><Button onClick={() => transcribe(i)}>Transcribe</Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           {status && <p>{status}</p>}
         </div>
       )}
