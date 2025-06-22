@@ -80,7 +80,7 @@ export default function App() {
   const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
   const [ttsGenModel, setTtsGenModel] = useState('');
   const [asrModels, setAsrModels] = useState([]);
-  const [asrModel, setAsrModel] = useStoredState('asrModel', '');
+  const [selectedAsrModels, setSelectedAsrModels] = useStoredState('selectedAsrModels', []);
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const [loadingCount, setLoadingCount] = useState(0);
@@ -161,6 +161,15 @@ export default function App() {
     reader.readAsDataURL(blob);
   });
 
+  const dataUrlToBlob = dataUrl => {
+    const [header, data] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(data);
+    const arr = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  };
+
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
   useEffect(() => {
@@ -185,7 +194,7 @@ export default function App() {
         const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id }));
         if (asr?.length) {
           setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
-          if (!asrModel) setAsrModel(asr[0].id);
+          if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
         }
       } catch (e) {
         showError(e.message);
@@ -210,7 +219,7 @@ export default function App() {
     ];
     if (combined.length) {
       setAsrModels(combined);
-      if (!asrModel) setAsrModel(combined[0].id);
+      if (!selectedAsrModels.length) setSelectedAsrModels([combined[0].id]);
     }
   }, [openAiModels, googleModels]);
 
@@ -235,7 +244,7 @@ export default function App() {
           const asr = models.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }));
           if (asr.length) {
             setAsrModels(a => [...a.filter(x => !asr.some(mm => mm.id === x.id)), ...asr]);
-            if (!asrModel) setAsrModel(asr[0].id);
+            if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
           }
         }
       } catch (e) {
@@ -421,37 +430,39 @@ export default function App() {
     const audio = audios[aIndex];
     if (!audio) return;
     setStatus('Transcribing...');
-    const finish = (text, provider) => {
-      setTranscripts([...transcripts, { aIndex, provider, text, prompt: asrPrompt }]);
-      setStatus('');
-    };
-    if (mockMode) {
-      const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
-      if (SR) {
-        try {
-          const recognition = new SR();
-          recognition.lang = 'et-EE';
-          recognition.onresult = e => {
-            const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-            finish(text, 'browser-asr');
-          };
-          recognition.onerror = () => finish(makeMockTranscription(texts[audio.index]?.text || ''), 'mock');
-          recognition.start();
-          if (audio.url) {
-            new Audio(audio.url).play();
-          }
-          return;
-        } catch {
-          // ignore and fallback
-        }
+    const blob = dataUrlToBlob(audio.data || audio.url);
+    for (const model of selectedAsrModels) {
+      const finish = (text, provider) => {
+        setTranscripts(t => [...t, { aIndex, provider, text, prompt: asrPrompt }]);
+      };
+      if (mockMode) {
+        const text = makeMockTranscription(texts[audio.index]?.text || '');
+        finish(text, 'mock');
+        continue;
       }
-      const text = makeMockTranscription(texts[audio.index]?.text || '');
-      finish(text, 'mock');
-      return;
+      if (openAiModels.includes(model)) {
+        const form = new FormData();
+        form.append('model', model);
+        form.append('file', blob, 'audio.webm');
+        if (asrPrompt) form.append('prompt', asrPrompt);
+        try {
+          const url = 'https://api.openai.com/v1/audio/transcriptions';
+          const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
+          const data = await res.json().catch(() => ({}));
+          addLog('POST', url, '<audio>', data);
+          if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
+          const text = data.text?.trim();
+          if (text) finish(text, model);
+        } catch (e) {
+          showError(e.message);
+        }
+      } else {
+        addLog('ASR', model, '<audio>');
+        const text = texts[audio.index]?.text || '';
+        finish(text, model);
+      }
     }
-    addLog('ASR', asrModel || 'copy', '<audio>');
-    const transcript = texts[audio.index]?.text || '';
-    finish(transcript, asrModel || 'copy');
+    setStatus('');
   };
 
   const deleteAudio = (aIndex) => {
@@ -638,7 +649,7 @@ export default function App() {
       {view === 'stt' && (
         <div style={{ padding: '1rem' }}>
           <Typography variant="h6">Speech-to-Text</Typography>
-          <Select value={asrModel} onChange={e => setAsrModel(e.target.value)} fullWidth>
+          <Select multiple value={selectedAsrModels} onChange={e => setSelectedAsrModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {asrModels.map(m => (
               <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
             ))}
