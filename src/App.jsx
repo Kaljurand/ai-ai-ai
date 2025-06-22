@@ -6,8 +6,6 @@ import {
   TextField,
   Select,
   MenuItem,
-  Drawer,
-  IconButton,
   AppBar,
   Toolbar,
   Typography,
@@ -20,7 +18,6 @@ import {
   ListItem,
   ListItemText,
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -70,7 +67,6 @@ export default function App() {
   const [googleModels, setGoogleModels] = useState([]);
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [genPrompt, setGenPrompt] = useStoredState('genPrompt', 'Generate a realistic Estonian weather report');
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
@@ -456,82 +452,15 @@ export default function App() {
     <>
       <AppBar position="static">
         <Toolbar>
-          <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)}>
-            <MenuIcon />
-          </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>Estonian Speech Comparison Tool</Typography>
           <Tabs value={view} onChange={(e, v) => setView(v)} textColor="inherit" indicatorColor="secondary">
             <Tab value="audio" label="Audio Generation" />
             <Tab value="results" label="Results" />
             <Tab value="prompts" label="Prompts" />
+            <Tab value="config" label="Config" />
           </Tabs>
         </Toolbar>
       </AppBar>
-      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <div style={{ width: 250, padding: '1rem' }}>
-          <Typography variant="h6">Configuration</Typography>
-          <TextField
-            label="OpenAI API key"
-            type="password"
-            value={apiKeys.openai}
-            onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Google API key"
-            type="password"
-            value={apiKeys.google}
-            onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
-            fullWidth
-            margin="normal"
-          />
-          {mockMode && <Typography color="error">Mock mode active: no API key</Typography>}
-          <Typography variant="subtitle1" sx={{ mt: 2 }}>Text Generation</Typography>
-          <Select value={provider} onChange={e => setProvider(e.target.value)} fullWidth>
-            <MenuItem value="openai">OpenAI</MenuItem>
-            <MenuItem value="google">Google</MenuItem>
-          </Select>
-          {provider === 'openai' && (
-            <Select value={openAiModel} onChange={e => setOpenAiModel(e.target.value)} fullWidth margin="normal">
-              {openAiModels.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
-              {!openAiModels.length && <MenuItem value="gpt-3.5-turbo">gpt-3.5-turbo</MenuItem>}
-            </Select>
-          )}
-          {provider === 'google' && (
-            <Select value={googleModel} onChange={e => setGoogleModel(e.target.value)} fullWidth margin="normal">
-              {googleModels.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
-            </Select>
-          )}
-          <TextField
-            label="Generation prompt"
-            multiline
-            rows={3}
-            value={genPrompt}
-            onChange={e => setGenPrompt(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="TTS prompt"
-            multiline
-            rows={2}
-            value={ttsPrompt}
-            onChange={e => setTtsPrompt(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="ASR prompt"
-            multiline
-            rows={2}
-            value={asrPrompt}
-            onChange={e => setAsrPrompt(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-        </div>
-      </Drawer>
       {view === 'audio' && (
         <div style={{ padding: '1rem' }}>
           <FormControlLabel control={<Checkbox checked={generateTtsPrompt} onChange={e => setGenerateTtsPrompt(e.target.checked)} />} label="Generate the TTS prompt" />
@@ -628,6 +557,28 @@ export default function App() {
               </ListItem>
             ))}
           </List>
+        </div>
+      )}
+      {view === 'config' && (
+        <div style={{ padding: '1rem' }}>
+          <Typography variant="h6">Configuration</Typography>
+          <TextField
+            label="OpenAI API key"
+            type="password"
+            value={apiKeys.openai}
+            onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Google API key"
+            type="password"
+            value={apiKeys.google}
+            onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          {mockMode && <Typography color="error">Mock mode active: no API key</Typography>}
         </div>
       )}
       <Snackbar open={!!errorMsg} message={errorMsg} onClose={() => setErrorMsg('')} autoHideDuration={6000} />
