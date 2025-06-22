@@ -77,6 +77,8 @@ export default function App() {
   const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
   const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
   const [ttsGenModel, setTtsGenModel] = useState('');
+  const [asrModels, setAsrModels] = useState([]);
+  const [asrModel, setAsrModel] = useStoredState('asrModel', '');
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
@@ -161,6 +163,11 @@ export default function App() {
           setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !tts.some(v => v.id === x.id)), ...tts]);
           if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
         }
+        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id }));
+        if (asr?.length) {
+          setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
+          if (!asrModel) setAsrModel(asr[0].id);
+        }
       } catch (e) {
         showError(e.message);
       }
@@ -174,6 +181,17 @@ export default function App() {
     ];
     if (!ttsGenModel && all.length) {
       setTtsGenModel(all[0].id);
+    }
+  }, [openAiModels, googleModels]);
+
+  useEffect(() => {
+    const combined = [
+      ...openAiModels.filter(m => /whisper|speech|audio|transcribe/i.test(m)).map(m => ({ id: m, name: m })),
+      ...googleModels.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }))
+    ];
+    if (combined.length) {
+      setAsrModels(combined);
+      if (!asrModel) setAsrModel(combined[0].id);
     }
   }, [openAiModels, googleModels]);
 
@@ -194,6 +212,11 @@ export default function App() {
           if (multi.length) {
             setTtsModels(t => [...t.filter(x => !multi.some(mm => mm.id === x.id)), ...multi]);
             if (!selectedTtsModels.length) setSelectedTtsModels([multi[0].id]);
+          }
+          const asr = models.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }));
+          if (asr.length) {
+            setAsrModels(a => [...a.filter(x => !asr.some(mm => mm.id === x.id)), ...asr]);
+            if (!asrModel) setAsrModel(asr[0].id);
           }
         }
       } catch (e) {
@@ -343,13 +366,31 @@ export default function App() {
     setTexts([...texts, { provider: 'tts', text: ttsPrompt }]);
     for (const model of selectedTtsModels) {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
-      addLog('TTS', model, ttsPrompt, '', cost);
       if (mockMode) {
+        addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
         const url = URL.createObjectURL(blob);
         setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
+      } else if (openAiModels.includes(model)) {
+        const url = 'https://api.openai.com/v1/audio/speech';
+        const body = { model, input: ttsPrompt, voice: 'alloy', response_format: 'mp3' };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          addLog('POST', url, body, err, cost);
+          showError(err.error?.message || 'TTS request failed');
+          continue;
+        }
+        const blob = await res.blob();
+        addLog('POST', url, body, '<audio>', cost);
+        const aUrl = URL.createObjectURL(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: aUrl, prompt: ttsPrompt, timestamp }]);
       } else {
-        // Replace with real TTS server call
+        addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([`${model}:${ttsPrompt}`], { type: 'audio/plain' });
         const url = URL.createObjectURL(blob);
         setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
@@ -389,8 +430,9 @@ export default function App() {
       finish(text, 'mock');
       return;
     }
+    addLog('ASR', asrModel || 'copy', '<audio>');
     const transcript = texts[audio.index]?.text || '';
-    finish(transcript, 'copy');
+    finish(transcript, asrModel || 'copy');
   };
 
   const deleteAudio = (aIndex) => {
@@ -462,6 +504,7 @@ export default function App() {
             <Tab value="audio" label="Audio Generation" />
             <Tab value="results" label="Results" />
             <Tab value="prompts" label="Prompts" />
+            <Tab value="stt" label="STT Config" />
             <Tab value="config" label="Config" />
             <Tab value="log" label="Log" />
           </Tabs>
@@ -563,6 +606,17 @@ export default function App() {
               </ListItem>
             ))}
           </List>
+        </div>
+      )}
+      {view === 'stt' && (
+        <div style={{ padding: '1rem' }}>
+          <Typography variant="h6">Speech-to-Text</Typography>
+          <Select value={asrModel} onChange={e => setAsrModel(e.target.value)} fullWidth>
+            {asrModels.map(m => (
+              <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
+            ))}
+          </Select>
+          <TextField label="ASR Prompt" multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
         </div>
       )}
       {view === 'log' && (
