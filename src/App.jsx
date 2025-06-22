@@ -75,10 +75,10 @@ export default function App() {
 
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([]);
-  const [selectedTtsModels, setSelectedTtsModels] = useState([]);
+  const [selectedTtsModels, setSelectedTtsModels] = useStoredState('selectedTtsModels', []);
   const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
   const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
-  const [ttsGenModel, setTtsGenModel] = useState('');
+  const [ttsGenModel, setTtsGenModel] = useStoredState('ttsGenModel', '');
   const [asrModels, setAsrModels] = useState([]);
   const [selectedAsrModels, setSelectedAsrModels] = useStoredState('selectedAsrModels', []);
   const [recording, setRecording] = useState(false);
@@ -89,6 +89,13 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [logs, setLogs] = useStoredState('logs', []);
   const [logSort, setLogSort] = useState({ column: 'time', asc: false });
+  const [visibleCols, setVisibleCols] = useStoredState('visibleResultCols', {
+    model: true,
+    original: true,
+    transcription: true,
+    wer: true,
+    diff: true,
+  });
 
   const predefinedPrompts = [
     'Write a 4-turn dialogue in Estonian between two speakers discussing the weather. The dialogue should include specific temperatures, wind speeds, dates, times, and common weather-related abbreviations (like °C, km/h, EMHI, jne.). The tone should be natural but information-dense.',
@@ -503,8 +510,8 @@ export default function App() {
   };
 
   const exportCSV = () => {
-    const header = 'index,original,transcription,wer\n';
-    const lines = rows.map(r => `${r.i},"${r.original}","${r.transcription}",${r.wer}`).join('\n');
+    const header = 'index,model,original,transcription,wer\n';
+    const lines = rows.map(r => `${r.i},${r.model},"${r.original}","${r.transcription}",${r.wer}`).join('\n');
     const blob = new Blob([header + lines], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -518,7 +525,7 @@ export default function App() {
     const txt = texts[audio.index];
     const wer = wordErrorRate(txt.text, t.text);
     const diff = diffWordsHtml(txt.text, t.text);
-    return { i: i + 1, original: txt.text, transcription: t.text, wer, diff };
+    return { i: i + 1, model: t.provider, original: txt.text, transcription: t.text, wer, diff };
   });
 
   const sortedAudios = sortItems(audios, audioSort);
@@ -607,14 +614,33 @@ export default function App() {
           <Button onClick={exportJSON}>Export JSON</Button>
           <Button onClick={exportCSV}>Export CSV</Button>
           <Button onClick={clearData}>Clear Data</Button>
+          <div>
+            {Object.entries(visibleCols).map(([k, v]) => (
+              <FormControlLabel key={k}
+                control={<Checkbox checked={v} onChange={e => setVisibleCols({ ...visibleCols, [k]: e.target.checked })} />}
+                label={k.charAt(0).toUpperCase() + k.slice(1)}
+              />
+            ))}
+          </div>
           <table>
             <thead>
               <tr>
                 <th onClick={() => handleResultSort('i')}>#</th>
-                <th onClick={() => handleResultSort('original')}>Original Text</th>
-                <th onClick={() => handleResultSort('transcription')}>Transcription</th>
-                <th onClick={() => handleResultSort('wer')}>WER</th>
-                <th>Diff</th>
+                {visibleCols.model && (
+                  <th onClick={() => handleResultSort('model')}>Model</th>
+                )}
+                {visibleCols.original && (
+                  <th onClick={() => handleResultSort('original')}>Original Text</th>
+                )}
+                {visibleCols.transcription && (
+                  <th onClick={() => handleResultSort('transcription')}>Transcription</th>
+                )}
+                {visibleCols.wer && (
+                  <th onClick={() => handleResultSort('wer')}>WER</th>
+                )}
+                {visibleCols.diff && (
+                  <th>Diff</th>
+                )}
                 <th>Actions</th>
               </tr>
             </thead>
@@ -622,10 +648,11 @@ export default function App() {
               {sortedRows.map((r, idx) => (
                 <tr key={idx}>
                   <td>{r.i}</td>
-                  <td>{r.original}</td>
-                  <td>{r.transcription}</td>
-                  <td>{r.wer}</td>
-                  <td dangerouslySetInnerHTML={{__html:r.diff}}></td>
+                  {visibleCols.model && <td>{r.model}</td>}
+                  {visibleCols.original && <td>{r.original}</td>}
+                  {visibleCols.transcription && <td>{r.transcription}</td>}
+                  {visibleCols.wer && <td>{r.wer}</td>}
+                  {visibleCols.diff && <td dangerouslySetInnerHTML={{__html:r.diff}}></td>}
                   <td><Button onClick={() => deleteTranscript(idx)} color="error">Delete</Button></td>
                 </tr>
               ))}
