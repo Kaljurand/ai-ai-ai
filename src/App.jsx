@@ -82,6 +82,7 @@ export default function App() {
   const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
   const [resultSort, setResultSort] = useState({ column: 'i', asc: true });
   const [errorMsg, setErrorMsg] = useState('');
+  const [logs, setLogs] = useStoredState('logs', []);
 
   const predefinedPrompts = [
     'Write a 4-turn dialogue in Estonian between two speakers discussing the weather. The dialogue should include specific temperatures, wind speeds, dates, times, and common weather-related abbreviations (like °C, km/h, EMHI, jne.). The tone should be natural but information-dense.',
@@ -125,10 +126,15 @@ export default function App() {
     setErrorMsg(msg);
   };
 
+  const addLog = (url, cost = '') => {
+    setLogs(l => [...l, { time: new Date().toISOString(), url, cost }]);
+  };
+
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
   useEffect(() => {
     if (!apiKeys.openai) return;
+    addLog('GET https://api.openai.com/v1/models');
     fetch('https://api.openai.com/v1/models', {
       headers: {
         'Authorization': `Bearer ${apiKeys.openai}`
@@ -168,6 +174,7 @@ export default function App() {
 
   useEffect(() => {
     if (!apiKeys.google) return;
+    addLog('GET https://generativelanguage.googleapis.com/v1beta/models');
     fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`)
       .then(async r => {
         if (!r.ok) {
@@ -188,6 +195,7 @@ export default function App() {
 
   useEffect(() => {
     if (!apiKeys.google) return;
+    addLog('GET https://texttospeech.googleapis.com/v1/voices');
     fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`)
       .then(async r => {
         if (!r.ok) {
@@ -217,6 +225,7 @@ export default function App() {
     const prompt = genPrompt;
     let text = '';
     if (provider === 'google') {
+      addLog(`POST https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText`);
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -231,6 +240,7 @@ export default function App() {
       const data = await res.json();
       text = data.candidates?.[0]?.output?.trim();
     } else {
+      addLog('POST https://api.openai.com/v1/chat/completions');
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -304,6 +314,7 @@ export default function App() {
     const modelInfo = ttsGenModelsList.find(m => m.id === ttsGenModel);
     try {
       if (modelInfo?.provider === 'google') {
+        addLog(`POST https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText`);
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -316,6 +327,7 @@ export default function App() {
         const data = await res.json();
         text = data.candidates?.[0]?.output?.trim();
       } else if (modelInfo?.provider === 'openai') {
+        addLog('POST https://api.openai.com/v1/chat/completions');
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
@@ -340,6 +352,8 @@ export default function App() {
     const timestamp = new Date().toISOString();
     setTexts([...texts, { provider: 'tts', text: ttsPrompt }]);
     for (const model of selectedTtsModels) {
+      const cost = ttsModels.find(m => m.id === model)?.cost || '';
+      addLog(`TTS ${model}`, cost);
       if (mockMode) {
         const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
         const url = URL.createObjectURL(blob);
@@ -458,6 +472,7 @@ export default function App() {
             <Tab value="results" label="Results" />
             <Tab value="prompts" label="Prompts" />
             <Tab value="config" label="Config" />
+            <Tab value="log" label="Log" />
           </Tabs>
         </Toolbar>
       </AppBar>
@@ -557,6 +572,25 @@ export default function App() {
               </ListItem>
             ))}
           </List>
+        </div>
+      )}
+      {view === 'log' && (
+        <div style={{ padding: '1rem' }}>
+          <Typography variant="h6">Log</Typography>
+          <table style={{ width: '100%' }}>
+            <thead>
+              <tr><th>Time</th><th>Endpoint</th><th>Cost</th></tr>
+            </thead>
+            <tbody>
+              {logs.map((l, i) => (
+                <tr key={i}>
+                  <td>{l.time}</td>
+                  <td>{l.url}</td>
+                  <td>{l.cost}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       {view === 'config' && (
