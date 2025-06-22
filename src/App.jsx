@@ -17,6 +17,8 @@ import {
   List,
   ListItem,
   ListItemText,
+  CircularProgress,
+  Box,
 } from '@mui/material';
 
 function useStoredState(key, initial) {
@@ -81,6 +83,7 @@ export default function App() {
   const [asrModel, setAsrModel] = useStoredState('asrModel', '');
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
+  const [loadingCount, setLoadingCount] = useState(0);
   const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
   const [resultSort, setResultSort] = useState({ column: 'i', asc: true });
   const [errorMsg, setErrorMsg] = useState('');
@@ -142,6 +145,22 @@ export default function App() {
     setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: short(body), response: short(response), cost }]);
   };
 
+  const fetchWithLoading = async (url, opts) => {
+    setLoadingCount(c => c + 1);
+    try {
+      return await fetch(url, opts);
+    } finally {
+      setLoadingCount(c => c - 1);
+    }
+  };
+
+  const blobToDataUrl = blob => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
   useEffect(() => {
@@ -149,7 +168,7 @@ export default function App() {
     (async () => {
       const url = 'https://api.openai.com/v1/models';
       try {
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKeys.openai}` } });
+        const res = await fetchWithLoading(url, { headers: { 'Authorization': `Bearer ${apiKeys.openai}` } });
         const data = await res.json().catch(() => ({}));
         addLog('GET', url, '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch OpenAI models');
@@ -200,7 +219,7 @@ export default function App() {
     (async () => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`;
       try {
-        const res = await fetch(url);
+        const res = await fetchWithLoading(url);
         const data = await res.json().catch(() => ({}));
         addLog('GET', 'https://generativelanguage.googleapis.com/v1beta/models', '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google models');
@@ -230,7 +249,7 @@ export default function App() {
     (async () => {
       const url = `https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`;
       try {
-        const res = await fetch(url);
+        const res = await fetchWithLoading(url);
         const data = await res.json().catch(() => ({}));
         addLog('GET', 'https://texttospeech.googleapis.com/v1/voices', '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google voices');
@@ -258,7 +277,7 @@ export default function App() {
     if (provider === 'google') {
       const body = { prompt: { text: prompt } };
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`;
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       addLog('POST', url, body, data);
       if (!res.ok) {
@@ -270,7 +289,7 @@ export default function App() {
     } else {
       const body = { model: openAiModel, messages: [{ role: 'user', content: prompt }] };
       const url = 'https://api.openai.com/v1/chat/completions';
-      const res = await fetch(url, {
+      const res = await fetchWithLoading(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
         body: JSON.stringify(body)
@@ -289,13 +308,13 @@ export default function App() {
   };
 
 
-  const uploadAudio = (index, file) => {
+  const uploadAudio = async (index, file) => {
     if (!file) return;
-    const url = URL.createObjectURL(file);
+    const data = await blobToDataUrl(file);
     const idx = texts.length;
     const timestamp = new Date().toISOString();
     setTexts([...texts, { provider: 'upload', text: `Uploaded audio ${idx + 1}` }]);
-    setAudios([...audios, { index: idx, provider: 'upload', url, prompt: ttsPrompt, timestamp }]);
+    setAudios([...audios, { index: idx, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp }]);
   };
 
   const startRecording = async () => {
@@ -303,12 +322,12 @@ export default function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
-      rec.ondataavailable = e => {
-        const url = URL.createObjectURL(e.data);
+      rec.ondataavailable = async e => {
+        const data = await blobToDataUrl(e.data);
         const idx = texts.length;
         const timestamp = new Date().toISOString();
         setTexts([...texts, { provider: 'record', text: `Recorded audio ${idx + 1}` }]);
-        setAudios(a => [...a, { index: idx, provider: 'record', url, prompt: ttsPrompt, timestamp }]);
+        setAudios(a => [...a, { index: idx, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp }]);
       };
       rec.start();
       setRecorder(rec);
@@ -339,7 +358,7 @@ export default function App() {
       if (modelInfo?.provider === 'google') {
         const body = { prompt: { text: prompt } };
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`;
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         addLog('POST', url, body, data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
@@ -347,7 +366,7 @@ export default function App() {
       } else if (modelInfo?.provider === 'openai') {
         const body = { model: ttsGenModel, messages: [{ role: 'user', content: prompt }] };
         const url = 'https://api.openai.com/v1/chat/completions';
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
+        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         addLog('POST', url, body, data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
@@ -369,12 +388,12 @@ export default function App() {
       if (mockMode) {
         addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
-        const url = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
+        const data = await blobToDataUrl(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
       } else if (openAiModels.includes(model)) {
         const url = 'https://api.openai.com/v1/audio/speech';
         const body = { model, input: ttsPrompt, voice: 'alloy', response_format: 'mp3' };
-        const res = await fetch(url, {
+        const res = await fetchWithLoading(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
           body: JSON.stringify(body)
@@ -387,13 +406,13 @@ export default function App() {
         }
         const blob = await res.blob();
         addLog('POST', url, body, '<audio>', cost);
-        const aUrl = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: aUrl, prompt: ttsPrompt, timestamp }]);
+        const data = await blobToDataUrl(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
       } else {
         addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([`${model}:${ttsPrompt}`], { type: 'audio/plain' });
-        const url = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
+        const data = await blobToDataUrl(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
       }
     }
   };
@@ -508,6 +527,14 @@ export default function App() {
             <Tab value="config" label="Config" />
             <Tab value="log" label="Log" />
           </Tabs>
+          {loadingCount > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+              <CircularProgress size={20} color="inherit" />
+              {loadingCount > 1 && (
+                <Typography variant="caption" sx={{ ml: 0.5 }}>{loadingCount}</Typography>
+              )}
+            </Box>
+          )}
         </Toolbar>
       </AppBar>
       {view === 'audio' && (
