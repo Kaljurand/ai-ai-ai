@@ -77,12 +77,15 @@ export default function App() {
   const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
   const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
   const [ttsGenModel, setTtsGenModel] = useState('');
+  const [asrModels, setAsrModels] = useState([]);
+  const [asrModel, setAsrModel] = useStoredState('asrModel', '');
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
   const [resultSort, setResultSort] = useState({ column: 'i', asc: true });
   const [errorMsg, setErrorMsg] = useState('');
   const [logs, setLogs] = useStoredState('logs', []);
+  const [logSort, setLogSort] = useState({ column: 'time', asc: false });
 
   const predefinedPrompts = [
     'Write a 4-turn dialogue in Estonian between two speakers discussing the weather. The dialogue should include specific temperatures, wind speeds, dates, times, and common weather-related abbreviations (like °C, km/h, EMHI, jne.). The tone should be natural but information-dense.',
@@ -122,44 +125,53 @@ export default function App() {
     setResultSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
   };
 
+  const handleLogSort = col => {
+    setLogSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
+  };
+
   const showError = msg => {
     setErrorMsg(msg);
   };
 
-  const addLog = (url, cost = '') => {
-    setLogs(l => [...l, { time: new Date().toISOString(), url, cost }]);
+  const addLog = (method, url, body = '', response = '', cost = '') => {
+    const short = s => {
+      if (!s) return '';
+      if (typeof s !== 'string') s = JSON.stringify(s);
+      return s.length > 60 ? s.slice(0, 30) + '...' + s.slice(-20) : s;
+    };
+    setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: short(body), response: short(response), cost }]);
   };
 
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
   useEffect(() => {
     if (!apiKeys.openai) return;
-    addLog('GET https://api.openai.com/v1/models');
-    fetch('https://api.openai.com/v1/models', {
-      headers: {
-        'Authorization': `Bearer ${apiKeys.openai}`
-      }
-    })
-      .then(async r => {
-        if (!r.ok) {
-          const e = await r.json().catch(() => ({}));
-          throw new Error(e.error?.message || 'Failed to fetch OpenAI models');
-        }
-        return r.json();
-      })
-      .then(data => {
+    (async () => {
+      const url = 'https://api.openai.com/v1/models';
+      try {
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKeys.openai}` } });
+        const data = await res.json().catch(() => ({}));
+        addLog('GET', url, '', data);
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch OpenAI models');
         const models = data.data?.map(m => m.id).sort();
         if (models?.length) {
           setOpenAiModels(models);
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
-        const tts = data.data?.filter(m => m.id.startsWith('tts-')).map(m => ({ id: m.id, name: m.id, cost: '' }));
+        const tts = data.data?.filter(m => m.id.startsWith('tts-') || /audio|speech|multimodal/i.test(m.id)).map(m => ({ id: m.id, name: m.id, cost: '' }));
         if (tts?.length) {
-          setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-')), ...tts]);
+          setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !tts.some(v => v.id === x.id)), ...tts]);
           if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
         }
-      })
-      .catch(e => showError(e.message));
+        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id }));
+        if (asr?.length) {
+          setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
+          if (!asrModel) setAsrModel(asr[0].id);
+        }
+      } catch (e) {
+        showError(e.message);
+      }
+    })();
   }, [apiKeys.openai]);
 
   useEffect(() => {
@@ -173,45 +185,64 @@ export default function App() {
   }, [openAiModels, googleModels]);
 
   useEffect(() => {
+    const combined = [
+      ...openAiModels.filter(m => /whisper|speech|audio|transcribe/i.test(m)).map(m => ({ id: m, name: m })),
+      ...googleModels.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }))
+    ];
+    if (combined.length) {
+      setAsrModels(combined);
+      if (!asrModel) setAsrModel(combined[0].id);
+    }
+  }, [openAiModels, googleModels]);
+
+  useEffect(() => {
     if (!apiKeys.google) return;
-    addLog('GET https://generativelanguage.googleapis.com/v1beta/models');
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`)
-      .then(async r => {
-        if (!r.ok) {
-          const e = await r.json().catch(() => ({}));
-          throw new Error(e.error?.message || 'Failed to fetch Google models');
-        }
-        return r.json();
-      })
-      .then(data => {
+    (async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json().catch(() => ({}));
+        addLog('GET', 'https://generativelanguage.googleapis.com/v1beta/models', '', data);
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google models');
         const models = data.models?.map(m => m.name);
         if (models?.length) {
           setGoogleModels(models);
           if (!models.includes(googleModel)) setGoogleModel(models[0]);
+          const multi = models.filter(m => /speech|audio|multimodal/i.test(m)).map(m => ({ id: m, name: m, cost: '' }));
+          if (multi.length) {
+            setTtsModels(t => [...t.filter(x => !multi.some(mm => mm.id === x.id)), ...multi]);
+            if (!selectedTtsModels.length) setSelectedTtsModels([multi[0].id]);
+          }
+          const asr = models.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }));
+          if (asr.length) {
+            setAsrModels(a => [...a.filter(x => !asr.some(mm => mm.id === x.id)), ...asr]);
+            if (!asrModel) setAsrModel(asr[0].id);
+          }
         }
-      })
-      .catch(e => showError(e.message));
+      } catch (e) {
+        showError(e.message);
+      }
+    })();
   }, [apiKeys.google]);
 
   useEffect(() => {
     if (!apiKeys.google) return;
-    addLog('GET https://texttospeech.googleapis.com/v1/voices');
-    fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`)
-      .then(async r => {
-        if (!r.ok) {
-          const e = await r.json().catch(() => ({}));
-          throw new Error(e.error?.message || 'Failed to fetch Google voices');
-        }
-        return r.json();
-      })
-      .then(data => {
+    (async () => {
+      const url = `https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json().catch(() => ({}));
+        addLog('GET', 'https://texttospeech.googleapis.com/v1/voices', '', data);
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google voices');
         const voices = data.voices?.map(v => ({ id: v.name, name: v.name, cost: '' }));
         if (voices?.length) {
-          setTtsModels(t => [...t.filter(x => !x.id.startsWith('projects/')), ...voices]);
+          setTtsModels(t => [...t.filter(x => !x.id.startsWith('projects/') && !voices.some(v => v.id === x.id)), ...voices]);
           if (!selectedTtsModels.length) setSelectedTtsModels([voices[0].id]);
         }
-      })
-      .catch(e => showError(e.message));
+      } catch (e) {
+        showError(e.message);
+      }
+    })();
   }, [apiKeys.google]);
 
   const generateText = async () => {
@@ -225,40 +256,32 @@ export default function App() {
     const prompt = genPrompt;
     let text = '';
     if (provider === 'google') {
-      addLog(`POST https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText`);
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: { text: prompt } })
-      });
+      const body = { prompt: { text: prompt } };
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`;
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      addLog('POST', url, body, data);
       if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        showError(e.error?.message || 'Text generation failed');
+        showError(data.error?.message || 'Text generation failed');
         setStatus('');
         return;
       }
-      const data = await res.json();
       text = data.candidates?.[0]?.output?.trim();
     } else {
-      addLog('POST https://api.openai.com/v1/chat/completions');
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const body = { model: openAiModel, messages: [{ role: 'user', content: prompt }] };
+      const url = 'https://api.openai.com/v1/chat/completions';
+      const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKeys.openai}`
-        },
-        body: JSON.stringify({
-          model: openAiModel,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
+        body: JSON.stringify(body)
       });
+      const data = await res.json().catch(() => ({}));
+      addLog('POST', url, body, data);
       if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        showError(e.error?.message || 'Text generation failed');
+        showError(data.error?.message || 'Text generation failed');
         setStatus('');
         return;
       }
-      const data = await res.json();
       text = data.choices?.[0]?.message?.content?.trim();
     }
     if (text) setTexts([...texts, { provider, text, prompt }]);
@@ -314,30 +337,20 @@ export default function App() {
     const modelInfo = ttsGenModelsList.find(m => m.id === ttsGenModel);
     try {
       if (modelInfo?.provider === 'google') {
-        addLog(`POST https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText`);
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: { text: prompt } })
-        });
-        if (!res.ok) {
-          const e = await res.json().catch(() => ({}));
-          throw new Error(e.error?.message || 'Failed to generate prompt');
-        }
-        const data = await res.json();
+        const body = { prompt: { text: prompt } };
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`;
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        addLog('POST', url, body, data);
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
         text = data.candidates?.[0]?.output?.trim();
       } else if (modelInfo?.provider === 'openai') {
-        addLog('POST https://api.openai.com/v1/chat/completions');
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
-          body: JSON.stringify({ model: ttsGenModel, messages: [{ role: 'user', content: prompt }] })
-        });
-        if (!res.ok) {
-          const e = await res.json().catch(() => ({}));
-          throw new Error(e.error?.message || 'Failed to generate prompt');
-        }
-        const data = await res.json();
+        const body = { model: ttsGenModel, messages: [{ role: 'user', content: prompt }] };
+        const url = 'https://api.openai.com/v1/chat/completions';
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        addLog('POST', url, body, data);
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
         text = data.choices?.[0]?.message?.content?.trim();
       }
     } catch (e) {
@@ -353,13 +366,31 @@ export default function App() {
     setTexts([...texts, { provider: 'tts', text: ttsPrompt }]);
     for (const model of selectedTtsModels) {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
-      addLog(`TTS ${model}`, cost);
       if (mockMode) {
+        addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
         const url = URL.createObjectURL(blob);
         setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
+      } else if (openAiModels.includes(model)) {
+        const url = 'https://api.openai.com/v1/audio/speech';
+        const body = { model, input: ttsPrompt, voice: 'alloy', response_format: 'mp3' };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          addLog('POST', url, body, err, cost);
+          showError(err.error?.message || 'TTS request failed');
+          continue;
+        }
+        const blob = await res.blob();
+        addLog('POST', url, body, '<audio>', cost);
+        const aUrl = URL.createObjectURL(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: aUrl, prompt: ttsPrompt, timestamp }]);
       } else {
-        // Replace with real TTS server call
+        addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([`${model}:${ttsPrompt}`], { type: 'audio/plain' });
         const url = URL.createObjectURL(blob);
         setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
@@ -399,8 +430,9 @@ export default function App() {
       finish(text, 'mock');
       return;
     }
+    addLog('ASR', asrModel || 'copy', '<audio>');
     const transcript = texts[audio.index]?.text || '';
-    finish(transcript, 'copy');
+    finish(transcript, asrModel || 'copy');
   };
 
   const deleteAudio = (aIndex) => {
@@ -461,6 +493,7 @@ export default function App() {
 
   const sortedAudios = sortItems(audios, audioSort);
   const sortedRows = sortItems(rows, resultSort);
+  const sortedLogs = sortItems(logs, logSort);
 
   return (
     <>
@@ -471,6 +504,7 @@ export default function App() {
             <Tab value="audio" label="Audio Generation" />
             <Tab value="results" label="Results" />
             <Tab value="prompts" label="Prompts" />
+            <Tab value="stt" label="STT Config" />
             <Tab value="config" label="Config" />
             <Tab value="log" label="Log" />
           </Tabs>
@@ -574,18 +608,39 @@ export default function App() {
           </List>
         </div>
       )}
+      {view === 'stt' && (
+        <div style={{ padding: '1rem' }}>
+          <Typography variant="h6">Speech-to-Text</Typography>
+          <Select value={asrModel} onChange={e => setAsrModel(e.target.value)} fullWidth>
+            {asrModels.map(m => (
+              <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
+            ))}
+          </Select>
+          <TextField label="ASR Prompt" multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
+        </div>
+      )}
       {view === 'log' && (
         <div style={{ padding: '1rem' }}>
           <Typography variant="h6">Log</Typography>
           <table style={{ width: '100%' }}>
             <thead>
-              <tr><th>Time</th><th>Endpoint</th><th>Cost</th></tr>
+              <tr>
+                <th onClick={() => handleLogSort('time')}>Time</th>
+                <th onClick={() => handleLogSort('method')}>Type</th>
+                <th onClick={() => handleLogSort('url')}>Endpoint</th>
+                <th>Body</th>
+                <th>Response</th>
+                <th onClick={() => handleLogSort('cost')}>Cost</th>
+              </tr>
             </thead>
             <tbody>
-              {logs.map((l, i) => (
+              {sortedLogs.map((l, i) => (
                 <tr key={i}>
                   <td>{l.time}</td>
+                  <td>{l.method}</td>
                   <td>{l.url}</td>
+                  <td>{l.body}</td>
+                  <td>{l.response}</td>
                   <td>{l.cost}</td>
                 </tr>
               ))}
