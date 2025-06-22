@@ -17,6 +17,8 @@ import {
   List,
   ListItem,
   ListItemText,
+  CircularProgress,
+  Box,
 } from '@mui/material';
 
 function useStoredState(key, initial) {
@@ -73,19 +75,27 @@ export default function App() {
 
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([]);
-  const [selectedTtsModels, setSelectedTtsModels] = useState([]);
+  const [selectedTtsModels, setSelectedTtsModels] = useStoredState('selectedTtsModels', []);
   const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
   const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
-  const [ttsGenModel, setTtsGenModel] = useState('');
+  const [ttsGenModel, setTtsGenModel] = useStoredState('ttsGenModel', '');
   const [asrModels, setAsrModels] = useState([]);
-  const [asrModel, setAsrModel] = useStoredState('asrModel', '');
+  const [selectedAsrModels, setSelectedAsrModels] = useStoredState('selectedAsrModels', []);
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
+  const [loadingCount, setLoadingCount] = useState(0);
   const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
   const [resultSort, setResultSort] = useState({ column: 'i', asc: true });
   const [errorMsg, setErrorMsg] = useState('');
   const [logs, setLogs] = useStoredState('logs', []);
   const [logSort, setLogSort] = useState({ column: 'time', asc: false });
+  const [visibleCols, setVisibleCols] = useStoredState('visibleResultCols', {
+    model: true,
+    original: true,
+    transcription: true,
+    wer: true,
+    diff: true,
+  });
 
   const predefinedPrompts = [
     'Write a 4-turn dialogue in Estonian between two speakers discussing the weather. The dialogue should include specific temperatures, wind speeds, dates, times, and common weather-related abbreviations (like °C, km/h, EMHI, jne.). The tone should be natural but information-dense.',
@@ -142,6 +152,31 @@ export default function App() {
     setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: short(body), response: short(response), cost }]);
   };
 
+  const fetchWithLoading = async (url, opts) => {
+    setLoadingCount(c => c + 1);
+    try {
+      return await fetch(url, opts);
+    } finally {
+      setLoadingCount(c => c - 1);
+    }
+  };
+
+  const blobToDataUrl = blob => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  const dataUrlToBlob = dataUrl => {
+    const [header, data] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(data);
+    const arr = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  };
+
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
   useEffect(() => {
@@ -149,7 +184,7 @@ export default function App() {
     (async () => {
       const url = 'https://api.openai.com/v1/models';
       try {
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKeys.openai}` } });
+        const res = await fetchWithLoading(url, { headers: { 'Authorization': `Bearer ${apiKeys.openai}` } });
         const data = await res.json().catch(() => ({}));
         addLog('GET', url, '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch OpenAI models');
@@ -166,7 +201,7 @@ export default function App() {
         const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id }));
         if (asr?.length) {
           setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
-          if (!asrModel) setAsrModel(asr[0].id);
+          if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
         }
       } catch (e) {
         showError(e.message);
@@ -191,7 +226,7 @@ export default function App() {
     ];
     if (combined.length) {
       setAsrModels(combined);
-      if (!asrModel) setAsrModel(combined[0].id);
+      if (!selectedAsrModels.length) setSelectedAsrModels([combined[0].id]);
     }
   }, [openAiModels, googleModels]);
 
@@ -200,7 +235,7 @@ export default function App() {
     (async () => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`;
       try {
-        const res = await fetch(url);
+        const res = await fetchWithLoading(url);
         const data = await res.json().catch(() => ({}));
         addLog('GET', 'https://generativelanguage.googleapis.com/v1beta/models', '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google models');
@@ -216,7 +251,7 @@ export default function App() {
           const asr = models.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }));
           if (asr.length) {
             setAsrModels(a => [...a.filter(x => !asr.some(mm => mm.id === x.id)), ...asr]);
-            if (!asrModel) setAsrModel(asr[0].id);
+            if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
           }
         }
       } catch (e) {
@@ -230,7 +265,7 @@ export default function App() {
     (async () => {
       const url = `https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`;
       try {
-        const res = await fetch(url);
+        const res = await fetchWithLoading(url);
         const data = await res.json().catch(() => ({}));
         addLog('GET', 'https://texttospeech.googleapis.com/v1/voices', '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google voices');
@@ -258,7 +293,7 @@ export default function App() {
     if (provider === 'google') {
       const body = { prompt: { text: prompt } };
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`;
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       addLog('POST', url, body, data);
       if (!res.ok) {
@@ -270,7 +305,7 @@ export default function App() {
     } else {
       const body = { model: openAiModel, messages: [{ role: 'user', content: prompt }] };
       const url = 'https://api.openai.com/v1/chat/completions';
-      const res = await fetch(url, {
+      const res = await fetchWithLoading(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
         body: JSON.stringify(body)
@@ -289,13 +324,13 @@ export default function App() {
   };
 
 
-  const uploadAudio = (index, file) => {
+  const uploadAudio = async (index, file) => {
     if (!file) return;
-    const url = URL.createObjectURL(file);
+    const data = await blobToDataUrl(file);
     const idx = texts.length;
     const timestamp = new Date().toISOString();
     setTexts([...texts, { provider: 'upload', text: `Uploaded audio ${idx + 1}` }]);
-    setAudios([...audios, { index: idx, provider: 'upload', url, prompt: ttsPrompt, timestamp }]);
+    setAudios([...audios, { index: idx, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp }]);
   };
 
   const startRecording = async () => {
@@ -303,12 +338,12 @@ export default function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
-      rec.ondataavailable = e => {
-        const url = URL.createObjectURL(e.data);
+      rec.ondataavailable = async e => {
+        const data = await blobToDataUrl(e.data);
         const idx = texts.length;
         const timestamp = new Date().toISOString();
         setTexts([...texts, { provider: 'record', text: `Recorded audio ${idx + 1}` }]);
-        setAudios(a => [...a, { index: idx, provider: 'record', url, prompt: ttsPrompt, timestamp }]);
+        setAudios(a => [...a, { index: idx, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp }]);
       };
       rec.start();
       setRecorder(rec);
@@ -339,7 +374,7 @@ export default function App() {
       if (modelInfo?.provider === 'google') {
         const body = { prompt: { text: prompt } };
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`;
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         addLog('POST', url, body, data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
@@ -347,7 +382,7 @@ export default function App() {
       } else if (modelInfo?.provider === 'openai') {
         const body = { model: ttsGenModel, messages: [{ role: 'user', content: prompt }] };
         const url = 'https://api.openai.com/v1/chat/completions';
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
+        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         addLog('POST', url, body, data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
@@ -369,12 +404,12 @@ export default function App() {
       if (mockMode) {
         addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
-        const url = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
+        const data = await blobToDataUrl(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
       } else if (openAiModels.includes(model)) {
         const url = 'https://api.openai.com/v1/audio/speech';
         const body = { model, input: ttsPrompt, voice: 'alloy', response_format: 'mp3' };
-        const res = await fetch(url, {
+        const res = await fetchWithLoading(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
           body: JSON.stringify(body)
@@ -387,13 +422,13 @@ export default function App() {
         }
         const blob = await res.blob();
         addLog('POST', url, body, '<audio>', cost);
-        const aUrl = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: aUrl, prompt: ttsPrompt, timestamp }]);
+        const data = await blobToDataUrl(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
       } else {
         addLog('TTS', model, ttsPrompt, '<audio>', cost);
         const blob = new Blob([`${model}:${ttsPrompt}`], { type: 'audio/plain' });
-        const url = URL.createObjectURL(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url, prompt: ttsPrompt, timestamp }]);
+        const data = await blobToDataUrl(blob);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
       }
     }
   };
@@ -402,37 +437,39 @@ export default function App() {
     const audio = audios[aIndex];
     if (!audio) return;
     setStatus('Transcribing...');
-    const finish = (text, provider) => {
-      setTranscripts([...transcripts, { aIndex, provider, text, prompt: asrPrompt }]);
-      setStatus('');
-    };
-    if (mockMode) {
-      const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
-      if (SR) {
-        try {
-          const recognition = new SR();
-          recognition.lang = 'et-EE';
-          recognition.onresult = e => {
-            const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-            finish(text, 'browser-asr');
-          };
-          recognition.onerror = () => finish(makeMockTranscription(texts[audio.index]?.text || ''), 'mock');
-          recognition.start();
-          if (audio.url) {
-            new Audio(audio.url).play();
-          }
-          return;
-        } catch {
-          // ignore and fallback
-        }
+    const blob = dataUrlToBlob(audio.data || audio.url);
+    for (const model of selectedAsrModels) {
+      const finish = (text, provider) => {
+        setTranscripts(t => [...t, { aIndex, provider, text, prompt: asrPrompt }]);
+      };
+      if (mockMode) {
+        const text = makeMockTranscription(texts[audio.index]?.text || '');
+        finish(text, 'mock');
+        continue;
       }
-      const text = makeMockTranscription(texts[audio.index]?.text || '');
-      finish(text, 'mock');
-      return;
+      if (openAiModels.includes(model)) {
+        const form = new FormData();
+        form.append('model', model);
+        form.append('file', blob, 'audio.webm');
+        if (asrPrompt) form.append('prompt', asrPrompt);
+        try {
+          const url = 'https://api.openai.com/v1/audio/transcriptions';
+          const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
+          const data = await res.json().catch(() => ({}));
+          addLog('POST', url, '<audio>', data);
+          if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
+          const text = data.text?.trim();
+          if (text) finish(text, model);
+        } catch (e) {
+          showError(e.message);
+        }
+      } else {
+        addLog('ASR', model, '<audio>');
+        const text = texts[audio.index]?.text || '';
+        finish(text, model);
+      }
     }
-    addLog('ASR', asrModel || 'copy', '<audio>');
-    const transcript = texts[audio.index]?.text || '';
-    finish(transcript, asrModel || 'copy');
+    setStatus('');
   };
 
   const deleteAudio = (aIndex) => {
@@ -473,8 +510,8 @@ export default function App() {
   };
 
   const exportCSV = () => {
-    const header = 'index,original,transcription,wer\n';
-    const lines = rows.map(r => `${r.i},"${r.original}","${r.transcription}",${r.wer}`).join('\n');
+    const header = 'index,model,original,transcription,wer\n';
+    const lines = rows.map(r => `${r.i},${r.model},"${r.original}","${r.transcription}",${r.wer}`).join('\n');
     const blob = new Blob([header + lines], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -488,7 +525,7 @@ export default function App() {
     const txt = texts[audio.index];
     const wer = wordErrorRate(txt.text, t.text);
     const diff = diffWordsHtml(txt.text, t.text);
-    return { i: i + 1, original: txt.text, transcription: t.text, wer, diff };
+    return { i: i + 1, model: t.provider, original: txt.text, transcription: t.text, wer, diff };
   });
 
   const sortedAudios = sortItems(audios, audioSort);
@@ -508,6 +545,14 @@ export default function App() {
             <Tab value="config" label="Config" />
             <Tab value="log" label="Log" />
           </Tabs>
+          {loadingCount > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+              <CircularProgress size={20} color="inherit" />
+              {loadingCount > 1 && (
+                <Typography variant="caption" sx={{ ml: 0.5 }}>{loadingCount}</Typography>
+              )}
+            </Box>
+          )}
         </Toolbar>
       </AppBar>
       {view === 'audio' && (
@@ -569,14 +614,33 @@ export default function App() {
           <Button onClick={exportJSON}>Export JSON</Button>
           <Button onClick={exportCSV}>Export CSV</Button>
           <Button onClick={clearData}>Clear Data</Button>
+          <div>
+            {Object.entries(visibleCols).map(([k, v]) => (
+              <FormControlLabel key={k}
+                control={<Checkbox checked={v} onChange={e => setVisibleCols({ ...visibleCols, [k]: e.target.checked })} />}
+                label={k.charAt(0).toUpperCase() + k.slice(1)}
+              />
+            ))}
+          </div>
           <table>
             <thead>
               <tr>
                 <th onClick={() => handleResultSort('i')}>#</th>
-                <th onClick={() => handleResultSort('original')}>Original Text</th>
-                <th onClick={() => handleResultSort('transcription')}>Transcription</th>
-                <th onClick={() => handleResultSort('wer')}>WER</th>
-                <th>Diff</th>
+                {visibleCols.model && (
+                  <th onClick={() => handleResultSort('model')}>Model</th>
+                )}
+                {visibleCols.original && (
+                  <th onClick={() => handleResultSort('original')}>Original Text</th>
+                )}
+                {visibleCols.transcription && (
+                  <th onClick={() => handleResultSort('transcription')}>Transcription</th>
+                )}
+                {visibleCols.wer && (
+                  <th onClick={() => handleResultSort('wer')}>WER</th>
+                )}
+                {visibleCols.diff && (
+                  <th>Diff</th>
+                )}
                 <th>Actions</th>
               </tr>
             </thead>
@@ -584,10 +648,11 @@ export default function App() {
               {sortedRows.map((r, idx) => (
                 <tr key={idx}>
                   <td>{r.i}</td>
-                  <td>{r.original}</td>
-                  <td>{r.transcription}</td>
-                  <td>{r.wer}</td>
-                  <td dangerouslySetInnerHTML={{__html:r.diff}}></td>
+                  {visibleCols.model && <td>{r.model}</td>}
+                  {visibleCols.original && <td>{r.original}</td>}
+                  {visibleCols.transcription && <td>{r.transcription}</td>}
+                  {visibleCols.wer && <td>{r.wer}</td>}
+                  {visibleCols.diff && <td dangerouslySetInnerHTML={{__html:r.diff}}></td>}
                   <td><Button onClick={() => deleteTranscript(idx)} color="error">Delete</Button></td>
                 </tr>
               ))}
@@ -611,7 +676,7 @@ export default function App() {
       {view === 'stt' && (
         <div style={{ padding: '1rem' }}>
           <Typography variant="h6">Speech-to-Text</Typography>
-          <Select value={asrModel} onChange={e => setAsrModel(e.target.value)} fullWidth>
+          <Select multiple value={selectedAsrModels} onChange={e => setSelectedAsrModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {asrModels.map(m => (
               <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
             ))}
