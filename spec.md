@@ -1,8 +1,8 @@
-# Estonian Speech Comparison Tool Specification
+# Speech Playground Specification
 
 ## Overview
 
-This tool compares the speech generation and transcription quality of various large language model providers using Estonian text.
+This tool compares the speech generation and transcription quality of various AI providers. While it still focuses on Estonian examples, the app is meant for experimenting with a wider set of speech services.
 
 ## Functional Requirements
 

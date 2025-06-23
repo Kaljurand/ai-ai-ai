@@ -1,6 +1,6 @@
-# Estonian Speech Comparison Tool
+# Speech Playground
 
-This repository contains a small proof-of-concept single page application for comparing Estonian text generation, text-to-speech (TTS) and automatic speech recognition (ASR) providers.
+This repository contains a small proof-of-concept single page application for experimenting with various AI speech services such as text generation, text-to-speech (TTS) and automatic speech recognition (ASR).
 
 The app now uses a small Vite build setup. Install dependencies and run the development server with:
 
