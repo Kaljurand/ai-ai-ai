@@ -57,8 +57,100 @@ function makeMockTranscription(text) {
   return out.join(' ');
 }
 
+const translations = {
+  en: {
+    appTitle: 'Estonian Speech Comparison Tool',
+    tabText: 'Text',
+    tabAudio: 'Audio',
+    tabAsr: 'ASR',
+    tabLog: 'Log',
+    tabSettings: 'Settings',
+    genPrompt: 'Generate Text',
+    promptForModels: 'Prompt for text generator',
+    uploadPrompt: 'Upload Prompt',
+    useText: 'Use for Audio',
+    textId: 'ID',
+    timestamp: 'Time',
+    text: 'Text',
+    source: 'Source',
+    ttsPromptLabel: 'TTS prompt',
+    generatePrompt: 'Generate Prompt',
+    generateAudio: 'Generate Audio',
+    uploadAudio: 'Upload Audio',
+    recordAudio: 'Record Audio',
+    stopRecording: 'Stop Recording',
+    audioId: 'ID',
+    audio: 'Audio',
+    actions: 'Actions',
+    toAsr: 'To ASR',
+    asrPromptLabel: 'ASR Prompt',
+    transcriptId: 'ID',
+    originalText: 'Original Text',
+    transcript: 'Transcript',
+    wer: 'WER',
+    diff: 'Diff',
+    delete: 'Delete',
+    exportJSON: 'Export JSON',
+    exportCSV: 'Export CSV',
+    exportMD: 'Export Markdown',
+    clearData: 'Clear Data',
+    openaiKey: 'OpenAI API key',
+    googleKey: 'Google API key',
+    language: 'Language',
+    mockMode: 'Mock mode active: no API key'
+  },
+  et: {
+    appTitle: 'Eesti k\u00f5nev\u00f5rdluse t\u00f6\u00f6riist',
+    tabText: 'Tekst',
+    tabAudio: 'Heli',
+    tabAsr: 'ASR',
+    tabLog: 'Logi',
+    tabSettings: 'Seaded',
+    genPrompt: 'Genereeri tekst',
+    promptForModels: 'P\u00e4ringu sisu',
+    uploadPrompt: 'Laadi tekst',
+    useText: 'Saada helisse',
+    textId: 'ID',
+    timestamp: 'Aeg',
+    text: 'Tekst',
+    source: 'Allikas',
+    ttsPromptLabel: 'TTS-prompt',
+    generatePrompt: 'Genereeri prompt',
+    generateAudio: 'Genereeri heli',
+    uploadAudio: 'Laadi heli',
+    recordAudio: 'Salvesta heli',
+    stopRecording: 'Peata salvestus',
+    audioId: 'ID',
+    audio: 'Heli',
+    actions: 'Tegevused',
+    toAsr: 'Saada ASR-i',
+    asrPromptLabel: 'ASR-prompt',
+    transcriptId: 'ID',
+    originalText: 'Algtekst',
+    transcript: 'Transkript',
+    wer: 'Viga%',
+    diff: 'Erinevus',
+    delete: 'Kustuta',
+    exportJSON: 'Ekspordi JSON',
+    exportCSV: 'Ekspordi CSV',
+    exportMD: 'Ekspordi Markdown',
+    clearData: 'Puhasta andmed',
+    openaiKey: 'OpenAI API v\u00f5ti',
+    googleKey: 'Google API v\u00f5ti',
+    language: 'Keel',
+    mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub'
+  }
+};
+
+function useTranslation() {
+  const [lang, setLang] = useStoredState('lang', 'en');
+  const t = key => translations[lang][key] || key;
+  return { t, lang, setLang };
+}
+
 export default function App() {
   const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
+  const { t, lang, setLang } = useTranslation();
   const [texts, setTexts] = useStoredState('texts', []);
   const [audios, setAudios] = useStoredState('audios', []);
   const [transcripts, setTranscripts] = useStoredState('transcripts', []);
@@ -69,7 +161,9 @@ export default function App() {
   const [googleModels, setGoogleModels] = useState([]);
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
-  const [genPrompt, setGenPrompt] = useStoredState('genPrompt', 'Generate a realistic Estonian weather report');
+  const [textPrompt, setTextPrompt] = useStoredState('textPrompt', 'Generate a realistic Estonian weather report');
+  const [selectedTextModels, setSelectedTextModels] = useStoredState('selectedTextModels', []);
+  const [selectedTextId, setSelectedTextId] = useState(null);
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
 
@@ -108,6 +202,21 @@ export default function App() {
       setSelectedTtsModels([ttsModels[0].id]);
     }
   }, [ttsModels]);
+
+  useEffect(() => {
+    if (selectedTextId === null && texts.length) setSelectedTextId(0);
+  }, [texts]);
+
+  const textModelsList = [
+    ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
+    ...googleModels.map(m => ({ id: m, provider: 'google' }))
+  ];
+
+  useEffect(() => {
+    if (textModelsList.length && !selectedTextModels.length) {
+      setSelectedTextModels([textModelsList[0].id]);
+    }
+  }, [textModelsList]);
 
   const ttsGenModelsList = [
     ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
@@ -280,70 +389,55 @@ export default function App() {
     })();
   }, [apiKeys.google]);
 
-  const generateText = async () => {
+  const generateTexts = async () => {
     setStatus('Generating text...');
-    if (mockMode) {
-      const mock = makeLongMockText(texts.length + 1);
-      setTexts([...texts, { provider: 'mock', text: mock }]);
-      setStatus('');
-      return;
-    }
-    const prompt = genPrompt;
-    let text = '';
-    if (provider === 'google') {
-      const body = { prompt: { text: prompt } };
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateText?key=${apiKeys.google}`;
-      const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await res.json().catch(() => ({}));
-      addLog('POST', url, body, data);
-      if (!res.ok) {
-        showError(data.error?.message || 'Text generation failed');
-        setStatus('');
-        return;
+    const timestamp = new Date().toISOString();
+    for (const model of selectedTextModels) {
+      if (mockMode) {
+        const mock = makeLongMockText(texts.length + 1);
+        setTexts(t => [...t, { provider: model, text: mock, prompt: textPrompt, timestamp }]);
+        continue;
       }
-      text = data.candidates?.[0]?.output?.trim();
-    } else {
-      const body = { model: openAiModel, messages: [{ role: 'user', content: prompt }] };
-      const url = 'https://api.openai.com/v1/chat/completions';
-      const res = await fetchWithLoading(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json().catch(() => ({}));
-      addLog('POST', url, body, data);
-      if (!res.ok) {
-        showError(data.error?.message || 'Text generation failed');
-        setStatus('');
-        return;
+      if (googleModels.includes(model)) {
+        const body = { prompt: { text: textPrompt } };
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateText?key=${apiKeys.google}`;
+        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        addLog('POST', url, body, data);
+        if (!res.ok) { showError(data.error?.message || 'Text generation failed'); continue; }
+        const text = data.candidates?.[0]?.output?.trim();
+        if (text) setTexts(t => [...t, { provider: model, text, prompt: textPrompt, timestamp }]);
+      } else {
+        const body = { model, messages: [{ role: 'user', content: textPrompt }] };
+        const url = 'https://api.openai.com/v1/chat/completions';
+        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        addLog('POST', url, body, data);
+        if (!res.ok) { showError(data.error?.message || 'Text generation failed'); continue; }
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) setTexts(t => [...t, { provider: model, text, prompt: textPrompt, timestamp }]);
       }
-      text = data.choices?.[0]?.message?.content?.trim();
     }
-    if (text) setTexts([...texts, { provider, text, prompt }]);
     setStatus('');
   };
 
 
-  const uploadAudio = async (index, file) => {
-    if (!file) return;
+  const uploadAudio = async (file) => {
+    if (!file || selectedTextId === null) return;
     const data = await blobToDataUrl(file);
-    const idx = texts.length;
     const timestamp = new Date().toISOString();
-    setTexts([...texts, { provider: 'upload', text: `Uploaded audio ${idx + 1}` }]);
-    setAudios([...audios, { index: idx, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp }]);
+    setAudios([...audios, { index: selectedTextId, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp }]);
   };
 
   const startRecording = async () => {
-    if (recording) return;
+    if (recording || selectedTextId === null) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
       rec.ondataavailable = async e => {
         const data = await blobToDataUrl(e.data);
-        const idx = texts.length;
         const timestamp = new Date().toISOString();
-        setTexts([...texts, { provider: 'record', text: `Recorded audio ${idx + 1}` }]);
-        setAudios(a => [...a, { index: idx, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp }]);
+        setAudios(a => [...a, { index: selectedTextId, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp }]);
       };
       rec.start();
       setRecorder(rec);
@@ -520,6 +614,17 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  const exportMD = () => {
+    const header = `|${t('transcriptId')}|${t('originalText')}|${t('transcript')}|${t('wer')}|\n|---|---|---|---|\n`;
+    const lines = rows.map(r => `|${r.i}|${r.original}|${r.transcription}|${r.wer}|`).join('\n');
+    const blob = new Blob([header + lines], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'results.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const rows = transcripts.map((t, i) => {
     const audio = audios[t.aIndex];
     const txt = texts[audio.index];
@@ -534,16 +639,15 @@ export default function App() {
 
   return (
     <>
-      <AppBar position="static">
+      <AppBar position="fixed">
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>Estonian Speech Comparison Tool</Typography>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>{t('appTitle')}</Typography>
           <Tabs value={view} onChange={(e, v) => setView(v)} textColor="inherit" indicatorColor="secondary">
-            <Tab value="audio" label="Audio Generation" />
-            <Tab value="results" label="Results" />
-            <Tab value="prompts" label="Prompts" />
-            <Tab value="stt" label="STT Config" />
-            <Tab value="config" label="Config" />
-            <Tab value="log" label="Log" />
+            <Tab value="text" label={t('tabText')} />
+            <Tab value="audio" label={t('tabAudio')} />
+            <Tab value="asr" label={t('tabAsr')} />
+            <Tab value="log" label={t('tabLog')} />
+            <Tab value="config" label={t('tabSettings')} />
           </Tabs>
           {loadingCount > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
@@ -555,9 +659,51 @@ export default function App() {
           )}
         </Toolbar>
       </AppBar>
+      <div style={{ paddingTop: '64px' }}>
+      {view === 'text' && (
+        <div style={{ padding: '1rem' }}>
+          <Select multiple value={selectedTextModels} onChange={e => setSelectedTextModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
+            {textModelsList.map(m => (
+              <MenuItem key={m.id} value={m.id}>{`${m.id} (${m.provider})`}</MenuItem>
+            ))}
+          </Select>
+          <TextField label={t('promptForModels')} multiline rows={3} value={textPrompt} onChange={e => setTextPrompt(e.target.value)} fullWidth margin="normal" />
+          <Button onClick={generateTexts}>{t('genPrompt')}</Button>
+          <Typography variant="h6" sx={{ mt: 2 }}>{t('tabText')}</Typography>
+          <List>
+            {predefinedPrompts.map((p, i) => (
+              <ListItem button key={i} onClick={() => setTextPrompt(p)}>
+                <ListItemText primary={p} />
+              </ListItem>
+            ))}
+          </List>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('textId')}</th>
+                <th>{t('timestamp')}</th>
+                <th>{t('text')}</th>
+                <th>{t('source')}</th>
+                <th>{t('actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {texts.map((txt, i) => (
+                <tr key={i}>
+                  <td>{i + 1}</td>
+                  <td>{txt.timestamp}</td>
+                  <td>{txt.text}</td>
+                  <td>{txt.provider}</td>
+                  <td><Button onClick={() => { setSelectedTextId(i); setTtsPrompt(txt.text); setView('audio'); }}>{t('useText')}</Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {view === 'audio' && (
         <div style={{ padding: '1rem' }}>
-          <FormControlLabel control={<Checkbox checked={generateTtsPrompt} onChange={e => setGenerateTtsPrompt(e.target.checked)} />} label="Generate the TTS prompt" />
+          <FormControlLabel control={<Checkbox checked={generateTtsPrompt} onChange={e => setGenerateTtsPrompt(e.target.checked)} />} label={t('generatePrompt')} />
           {generateTtsPrompt && (
             <>
               <Select value={ttsGenModel} onChange={e => setTtsGenModel(e.target.value)} fullWidth>
@@ -565,42 +711,44 @@ export default function App() {
                   <MenuItem key={m.id} value={m.id}>{`${m.id} (${m.provider})`}</MenuItem>
                 ))}
               </Select>
-              <TextField label="Prompt for text generator" multiline rows={3} value={ttsGenPrompt} onChange={e => setTtsGenPrompt(e.target.value)} fullWidth margin="normal" />
-              <Button onClick={generateTtsText}>Generate Prompt</Button>
+              <TextField label={t('promptForModels')} multiline rows={3} value={ttsGenPrompt} onChange={e => setTtsGenPrompt(e.target.value)} fullWidth margin="normal" />
+              <Button onClick={generateTtsText}>{t('generatePrompt')}</Button>
             </>
           )}
-          <TextField label="TTS prompt" multiline rows={3} value={ttsPrompt} onChange={e => setTtsPrompt(e.target.value)} fullWidth margin="normal" />
+          <TextField label={t('ttsPromptLabel')} multiline rows={3} value={ttsPrompt} onChange={e => setTtsPrompt(e.target.value)} fullWidth margin="normal" />
           <Select multiple value={selectedTtsModels} onChange={e => setSelectedTtsModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {ttsModels.map(m => (
               <MenuItem key={m.id} value={m.id}>{`${m.name} (${m.cost})`}</MenuItem>
             ))}
           </Select>
-          <Button variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>Generate Audio</Button>
+          <Button variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
           <Button component="label" sx={{ mt: 1, ml: 1 }}>
-            Upload Audio
-            <input type="file" accept="audio/*" hidden onChange={e => uploadAudio(texts.length, e.target.files[0])} />
+            {t('uploadAudio')}
+            <input type="file" accept="audio/*" hidden onChange={e => uploadAudio(e.target.files[0])} />
           </Button>
           <Button onClick={recording ? stopRecording : startRecording} sx={{ mt: 1, ml: 1 }}>
-            {recording ? 'Stop Recording' : 'Record Audio'}
+            {recording ? t('stopRecording') : t('recordAudio')}
           </Button>
           <table style={{ width: '100%', marginTop: '1rem' }}>
             <thead>
               <tr>
-                <th onClick={() => handleAudioSort('timestamp')}>Time</th>
-                <th onClick={() => handleAudioSort('provider')}>Provider</th>
-                <th>Audio</th>
-                <th>Actions</th>
+                <th onClick={() => handleAudioSort('timestamp')}>{t('timestamp')}</th>
+                <th onClick={() => handleAudioSort('index')}>{t('textId')}</th>
+                <th onClick={() => handleAudioSort('provider')}>{t('source')}</th>
+                <th>{t('audio')}</th>
+                <th>{t('actions')}</th>
               </tr>
             </thead>
             <tbody>
               {sortedAudios.map((a, i) => (
                 <tr key={i}>
                   <td>{a.timestamp}</td>
+                  <td>{a.index + 1}</td>
                   <td>{a.provider}</td>
                   <td>{a.url && <audio controls src={a.url}></audio>}</td>
                   <td>
-                    <Button onClick={() => transcribe(a._index)}>Transcribe</Button>
-                    <Button onClick={() => deleteAudio(a._index)} color="error" sx={{ ml: 1 }}>Delete</Button>
+                    <Button onClick={() => transcribe(a._index)}>{t('toAsr')}</Button>
+                    <Button onClick={() => deleteAudio(a._index)} color="error" sx={{ ml: 1 }}>{t('delete')}</Button>
                   </td>
                 </tr>
               ))}
@@ -609,11 +757,19 @@ export default function App() {
           {status && <p>{status}</p>}
         </div>
       )}
-      {view === 'results' && (
+      {view === 'asr' && (
         <div style={{ padding: '1rem' }}>
-          <Button onClick={exportJSON}>Export JSON</Button>
-          <Button onClick={exportCSV}>Export CSV</Button>
-          <Button onClick={clearData}>Clear Data</Button>
+          <Typography variant="h6">{t('tabAsr')}</Typography>
+          <Select multiple value={selectedAsrModels} onChange={e => setSelectedAsrModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
+            {asrModels.map(m => (
+              <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
+            ))}
+          </Select>
+          <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
+          <Button onClick={exportJSON}>{t('exportJSON')}</Button>
+          <Button onClick={exportCSV}>{t('exportCSV')}</Button>
+          <Button onClick={exportMD}>{t('exportMD')}</Button>
+          <Button onClick={clearData}>{t('clearData')}</Button>
           <div>
             {Object.entries(visibleCols).map(([k, v]) => (
               <FormControlLabel key={k}
@@ -625,23 +781,23 @@ export default function App() {
           <table>
             <thead>
               <tr>
-                <th onClick={() => handleResultSort('i')}>#</th>
+                <th onClick={() => handleResultSort('i')}>{t('transcriptId')}</th>
                 {visibleCols.model && (
-                  <th onClick={() => handleResultSort('model')}>Model</th>
+                  <th onClick={() => handleResultSort('model')}>{t('source')}</th>
                 )}
                 {visibleCols.original && (
-                  <th onClick={() => handleResultSort('original')}>Original Text</th>
+                  <th onClick={() => handleResultSort('original')}>{t('originalText')}</th>
                 )}
                 {visibleCols.transcription && (
-                  <th onClick={() => handleResultSort('transcription')}>Transcription</th>
+                  <th onClick={() => handleResultSort('transcription')}>{t('transcript')}</th>
                 )}
                 {visibleCols.wer && (
-                  <th onClick={() => handleResultSort('wer')}>WER</th>
+                  <th onClick={() => handleResultSort('wer')}>{t('wer')}</th>
                 )}
                 {visibleCols.diff && (
-                  <th>Diff</th>
+                  <th>{t('diff')}</th>
                 )}
-                <th>Actions</th>
+                <th>{t('actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -653,7 +809,7 @@ export default function App() {
                   {visibleCols.transcription && <td>{r.transcription}</td>}
                   {visibleCols.wer && <td>{r.wer}</td>}
                   {visibleCols.diff && <td dangerouslySetInnerHTML={{__html:r.diff}}></td>}
-                  <td><Button onClick={() => deleteTranscript(idx)} color="error">Delete</Button></td>
+                  <td><Button onClick={() => deleteTranscript(idx)} color="error">{t('delete')}</Button></td>
                 </tr>
               ))}
             </tbody>
@@ -661,37 +817,14 @@ export default function App() {
           {status && <p>{status}</p>}
         </div>
       )}
-      {view === 'prompts' && (
-        <div style={{ padding: '1rem' }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>Predefined Prompts</Typography>
-          <List>
-            {predefinedPrompts.map((p, i) => (
-              <ListItem button key={i} onClick={() => { setTtsGenPrompt(p); setView('audio'); setGenerateTtsPrompt(true); }}>
-                <ListItemText primary={p} />
-              </ListItem>
-            ))}
-          </List>
-        </div>
-      )}
-      {view === 'stt' && (
-        <div style={{ padding: '1rem' }}>
-          <Typography variant="h6">Speech-to-Text</Typography>
-          <Select multiple value={selectedAsrModels} onChange={e => setSelectedAsrModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
-            {asrModels.map(m => (
-              <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
-            ))}
-          </Select>
-          <TextField label="ASR Prompt" multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
-        </div>
-      )}
       {view === 'log' && (
         <div style={{ padding: '1rem' }}>
-          <Typography variant="h6">Log</Typography>
+          <Typography variant="h6">{t('tabLog')}</Typography>
           <table style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th onClick={() => handleLogSort('time')}>Time</th>
-                <th onClick={() => handleLogSort('method')}>Type</th>
+                <th onClick={() => handleLogSort('time')}>{t('timestamp')}</th>
+                <th onClick={() => handleLogSort('method')}>{t('actions')}</th>
                 <th onClick={() => handleLogSort('url')}>Endpoint</th>
                 <th>Body</th>
                 <th>Response</th>
@@ -715,9 +848,9 @@ export default function App() {
       )}
       {view === 'config' && (
         <div style={{ padding: '1rem' }}>
-          <Typography variant="h6">Configuration</Typography>
+          <Typography variant="h6">{t('tabSettings')}</Typography>
           <TextField
-            label="OpenAI API key"
+            label={t('openaiKey')}
             type="password"
             value={apiKeys.openai}
             onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
@@ -725,16 +858,21 @@ export default function App() {
             margin="normal"
           />
           <TextField
-            label="Google API key"
+            label={t('googleKey')}
             type="password"
             value={apiKeys.google}
             onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
             fullWidth
             margin="normal"
           />
-          {mockMode && <Typography color="error">Mock mode active: no API key</Typography>}
+          <Select value={lang} onChange={e => setLang(e.target.value)} fullWidth sx={{ mt: 1 }}>
+            <MenuItem value="en">English</MenuItem>
+            <MenuItem value="et">Eesti</MenuItem>
+          </Select>
+          {mockMode && <Typography color="error">{t('mockMode')}</Typography>}
         </div>
       )}
+      </div>
       <Snackbar open={!!errorMsg} message={errorMsg} onClose={() => setErrorMsg('')} autoHideDuration={6000} />
     </>
   );
