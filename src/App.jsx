@@ -137,7 +137,7 @@ const translations = {
     timestamp: 'Time',
     text: 'Text',
     source: 'Source',
-    ttsPromptLabel: 'TTS prompt',
+    ttsPromptLabel: 'Text',
     generateAudio: 'Generate Audio',
     metaPromptLabel: 'Meta prompt',
     uploadAudio: 'Upload Audio',
@@ -153,6 +153,9 @@ const translations = {
     transcript: 'Transcript',
     wer: 'WER',
     diff: 'Diff',
+    textSource: 'Text source',
+    audioSource: 'Audio source',
+    asrSource: 'ASR source',
     delete: 'Delete',
     exportJSON: 'Export JSON',
     exportCSV: 'Export CSV',
@@ -186,7 +189,7 @@ const translations = {
     timestamp: 'Aeg',
     text: 'Tekst',
     source: 'Allikas',
-    ttsPromptLabel: 'TTS-prompt',
+    ttsPromptLabel: 'Tekst',
     generateAudio: 'Genereeri heli',
     metaPromptLabel: 'Metaprompt',
     uploadAudio: 'Laadi heli',
@@ -202,6 +205,9 @@ const translations = {
     transcript: 'Transkript',
     wer: 'Viga%',
     diff: 'Erinevus',
+    textSource: 'Teksti allikas',
+    audioSource: 'Heli allikas',
+    asrSource: 'ASR allikas',
     delete: 'Kustuta',
     exportJSON: 'Ekspordi JSON',
     exportCSV: 'Ekspordi CSV',
@@ -218,6 +224,58 @@ const translations = {
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     close: 'Sulge',
     storageFailed: 'Salvestus eba\u00f5nnestus'
+  },
+  vro: {
+    appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
+    tabText: 'Tekst',
+    tabAudio: 'H\u00e4\u00e4l',
+    tabAsr: 'ASR',
+    tabLog: 'Logi',
+    tabSettings: 'S\u00f6tmis',
+    genPrompt: 'Genereeri tekst',
+    promptForModels: 'P\u00e4ringu sisu',
+    demoPromptLabel: 'Demopromptid',
+    uploadPrompt: 'Laadi tekst',
+    useText: 'Saada h\u00e4\u00e4le',
+    textId: 'ID',
+    timestamp: 'Aig',
+    text: 'Tekst',
+    source: 'Allikas',
+    ttsPromptLabel: 'Tekst',
+    generateAudio: 'Genereeri h\u00e4\u00e4l',
+    metaPromptLabel: 'Metaprompt',
+    uploadAudio: 'Laadi h\u00e4\u00e4l',
+    recordAudio: 'Salvesta h\u00e4\u00e4l',
+    stopRecording: 'Peata salvestus',
+    audioId: 'ID',
+    audio: 'H\u00e4\u00e4l',
+    actions: 'Tegemised',
+    toAsr: 'Saada ASR-i',
+    asrPromptLabel: 'ASR-prompt',
+    transcriptId: 'ID',
+    originalText: 'Algtekst',
+    transcript: 'Transkript',
+    wer: 'Viga%',
+    diff: 'Erinevus',
+    textSource: 'Teksti allikas',
+    audioSource: 'H\u00e4\u00e4le allikas',
+    asrSource: 'ASR allikas',
+    delete: 'Kustuta',
+    exportJSON: 'Ekspordi JSON',
+    exportCSV: 'Ekspordi CSV',
+    exportMD: 'Ekspordi Markdown',
+    clearData: 'Puhasta andmed',
+    openaiKey: 'OpenAI API v\u00f5ti',
+    googleKey: 'Google API v\u00f5ti',
+    sheetUrl: 'Google Sheeti URL',
+    publish: 'Avalda',
+    googleClientId: 'Google kliendi ID',
+    signIn: 'Logi Google\u2019i',
+    signOut: 'Logi v\u00e4lja',
+    language: 'Kiil',
+    mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
+    close: 'Sulge',
+    storageFailed: 'Salvestus epa\u00f5nnestus'
   }
 };
 
@@ -353,6 +411,12 @@ export default function App() {
     return new Blob([arr], { type: mime });
   };
 
+  const audioDuration = url => new Promise(resolve => {
+    const a = new Audio();
+    a.addEventListener('loadedmetadata', () => resolve(a.duration || 0));
+    a.src = url;
+  });
+
   const mockMode = !apiKeys.openai && !apiKeys.google;
 
   const signInGoogle = () => {
@@ -388,12 +452,12 @@ export default function App() {
           setOpenAiModels(models);
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
-        const tts = data.data?.filter(m => m.id.startsWith('tts-') || /audio|speech|multimodal/i.test(m.id)).map(m => ({ id: m.id, name: m.id, cost: '' }));
+        const tts = data.data?.filter(m => m.id.startsWith('tts-') || /audio|speech|multimodal/i.test(m.id)).map(m => ({ id: m.id, name: m.id, cost: '', provider: 'openai' }));
         if (tts?.length) {
           setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !tts.some(v => v.id === x.id)), ...tts]);
           if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
         }
-        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id }));
+        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id, provider: 'openai' }));
         if (asr?.length) {
           setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
           if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
@@ -407,8 +471,8 @@ export default function App() {
 
   useEffect(() => {
     const combined = [
-      ...openAiModels.filter(m => /whisper|speech|audio|transcribe/i.test(m)).map(m => ({ id: m, name: m })),
-      ...googleModels.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }))
+      ...openAiModels.filter(m => /whisper|speech|audio|transcribe/i.test(m)).map(m => ({ id: m, name: m, provider: 'openai' })),
+      ...googleModels.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m, provider: 'google' }))
     ];
     if (combined.length) {
       setAsrModels(combined);
@@ -429,12 +493,12 @@ export default function App() {
         if (models?.length) {
           setGoogleModels(models);
           if (!models.includes(googleModel)) setGoogleModel(models[0]);
-          const multi = models.filter(m => /speech|audio|multimodal/i.test(m)).map(m => ({ id: m, name: m, cost: '' }));
+          const multi = models.filter(m => /speech|audio|multimodal/i.test(m)).map(m => ({ id: m, name: m, cost: '', provider: 'google' }));
           if (multi.length) {
             setTtsModels(t => [...t.filter(x => !multi.some(mm => mm.id === x.id)), ...multi]);
             if (!selectedTtsModels.length) setSelectedTtsModels([multi[0].id]);
           }
-          const asr = models.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m }));
+          const asr = models.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m, provider: 'google' }));
           if (asr.length) {
             setAsrModels(a => [...a.filter(x => !asr.some(mm => mm.id === x.id)), ...asr]);
             if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
@@ -455,7 +519,7 @@ export default function App() {
         const data = await res.json().catch(() => ({}));
         addLog('GET', 'https://texttospeech.googleapis.com/v1/voices', '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google voices');
-        const voices = data.voices?.map(v => ({ id: v.name, name: v.name, cost: '' }));
+        const voices = data.voices?.map(v => ({ id: v.name, name: v.name, cost: '', provider: 'google' }));
         if (voices?.length) {
           setTtsModels(t => [...t.filter(x => !x.id.startsWith('projects/') && !voices.some(v => v.id === x.id)), ...voices]);
           if (!selectedTtsModels.length) setSelectedTtsModels([voices[0].id]);
@@ -502,8 +566,9 @@ export default function App() {
   const uploadAudio = async (file) => {
     if (!file || selectedTextId === null) return;
     const data = await blobToDataUrl(file);
+    const duration = await audioDuration(data);
     const timestamp = new Date().toISOString();
-    setAudios([...audios, { index: selectedTextId, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp }]);
+    setAudios([...audios, { index: selectedTextId, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp, duration }]);
   };
 
   const startRecording = async () => {
@@ -513,8 +578,9 @@ export default function App() {
       const rec = new MediaRecorder(stream);
       rec.ondataavailable = async e => {
         const data = await blobToDataUrl(e.data);
+        const duration = await audioDuration(data);
         const timestamp = new Date().toISOString();
-        setAudios(a => [...a, { index: selectedTextId, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp }]);
+        setAudios(a => [...a, { index: selectedTextId, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp, duration }]);
       };
       rec.start();
       setRecorder(rec);
@@ -543,7 +609,8 @@ export default function App() {
         addLog('TTS', model, fullPrompt, '<audio>', cost);
         const blob = new Blob([fullPrompt], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp }]);
+        const duration = await audioDuration(data);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
       } else if (openAiModels.includes(model)) {
         const url = 'https://api.openai.com/v1/audio/speech';
         const body = { model, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
@@ -561,12 +628,14 @@ export default function App() {
         const blob = await res.blob();
         addLog('POST', url, body, '<audio>', cost);
         const data = await blobToDataUrl(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp }]);
+        const duration = await audioDuration(data);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
       } else {
         addLog('TTS', model, fullPrompt, '<audio>', cost);
         const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp }]);
+        const duration = await audioDuration(data);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
       }
     }
   };
@@ -734,7 +803,14 @@ export default function App() {
     { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell },
     { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell },
     { field: 'provider', headerName: t('source'), width: 120, renderCell },
-    { field: 'audio', headerName: t('audio'), flex: 1, renderCell: p => (
+    {
+      field: 'text',
+      headerName: t('text'),
+      flex: 1,
+      valueGetter: p => (p && p.row && p.row.index != null ? (texts[p.row.index]?.text || '') : ''),
+      renderCell
+    },
+    { field: 'audio', headerName: t('audio'), flex: 1, sortComparator: (a,b,c,d) => (c?.row?.duration ?? 0) - (d?.row?.duration ?? 0), renderCell: p => (
       <div>
         {p.row.url && <audio controls src={p.row.url}></audio>}
         {p.row.storageError && <div style={{color:'red'}}>{t('storageFailed')}</div>}
@@ -762,7 +838,9 @@ export default function App() {
   const resultRows = rows.map((r, idx) => ({ id: idx, ...r, _index: idx }));
   const resultColumns = [
     { field: 'i', headerName: t('transcriptId'), width: 70, renderCell },
-    { field: 'model', headerName: t('source'), width: 140, renderCell },
+    { field: 'textSource', headerName: t('textSource'), width: 120, renderCell },
+    { field: 'audioSource', headerName: t('audioSource'), width: 120, renderCell },
+    { field: 'asrSource', headerName: t('asrSource'), width: 120, renderCell },
     { field: 'original', headerName: t('originalText'), flex: 1, renderCell },
     { field: 'transcription', headerName: t('transcript'), flex: 1, renderCell },
     { field: 'wer', headerName: t('wer'), width: 90, renderCell },
@@ -835,7 +913,7 @@ export default function App() {
         <div style={{ padding: '1rem' }}>
           <Select multiple value={selectedTextModels} onChange={e => setSelectedTextModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {textModelsList.map(m => (
-              <MenuItem key={m.id} value={m.id}>{`${m.id} (${m.provider})`}</MenuItem>
+              <MenuItem key={m.id} value={m.id}>{`${m.provider} ${m.id}`}</MenuItem>
             ))}
           </Select>
           <Select
@@ -852,7 +930,6 @@ export default function App() {
           </Select>
           <TextField label={t('promptForModels')} multiline rows={3} value={textPrompt} onChange={e => setTextPrompt(e.target.value)} fullWidth margin="normal" />
           <Button onClick={generateTexts}>{t('genPrompt')}</Button>
-          <Typography variant="h6" sx={{ mt: 2 }}>{t('tabText')}</Typography>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={textRows} columns={textColumns} name="texts" t={t} />
           <PersistedGrid
@@ -864,11 +941,11 @@ export default function App() {
       )}
       {view === 'audio' && (
         <div style={{ padding: '1rem' }}>
-          <TextField label={t('metaPromptLabel')} multiline rows={3} value={ttsMetaPrompt} onChange={e => setTtsMetaPrompt(e.target.value)} fullWidth margin="normal" />
-          <TextField label={t('ttsPromptLabel')} multiline rows={3} value={ttsPrompt} onChange={e => setTtsPrompt(e.target.value)} fullWidth margin="normal" />
+          <TextField label={t('metaPromptLabel')} multiline rows={2} value={ttsMetaPrompt} onChange={e => setTtsMetaPrompt(e.target.value)} fullWidth margin="normal" />
+          <TextField label={t('ttsPromptLabel')} multiline rows={4} value={ttsPrompt} InputProps={{ readOnly: true }} fullWidth margin="normal" />
           <Select multiple value={selectedTtsModels} onChange={e => setSelectedTtsModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {ttsModels.map(m => (
-              <MenuItem key={m.id} value={m.id}>{`${m.name} (${m.cost})`}</MenuItem>
+              <MenuItem key={m.id} value={m.id}>{`${m.provider} ${m.name}${m.cost ? ' (' + m.cost + ')' : ''}`}</MenuItem>
             ))}
           </Select>
           <Button variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
@@ -893,7 +970,7 @@ export default function App() {
         <div style={{ padding: '1rem' }}>
           <Select multiple value={selectedAsrModels} onChange={e => setSelectedAsrModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {asrModels.map(m => (
-              <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
+              <MenuItem key={m.id} value={m.id}>{`${m.provider} ${m.name}`}</MenuItem>
             ))}
           </Select>
           <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
@@ -960,6 +1037,7 @@ export default function App() {
           <Select value={lang} onChange={e => setLang(e.target.value)} fullWidth sx={{ mt: 1 }}>
             <MenuItem value="en">English</MenuItem>
             <MenuItem value="et">Eesti</MenuItem>
+            <MenuItem value="vro">V\u00f5ro</MenuItem>
           </Select>
           {mockMode && <Typography color="error">{t('mockMode')}</Typography>}
         </div>

@@ -7,4 +7,8 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     await expect(transform(code, { loader: 'jsx' })).resolves.toBeTruthy();
   });
+  it('contains Voro translations', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('vro:')).toBe(true);
+  });
 });
