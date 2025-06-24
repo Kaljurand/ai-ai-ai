@@ -11,4 +11,9 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('vro:')).toBe(true);
   });
+  it('includes new TTS model and prices tab', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('gpt-4o-mini-tts')).toBe(true);
+    expect(code.includes('tabPrices')).toBe(true);
+  });
 });
