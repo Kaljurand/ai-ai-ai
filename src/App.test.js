@@ -21,4 +21,8 @@ describe('App.jsx compilation', () => {
     expect(code.includes('darkMode')).toBe(true);
     expect(code.includes('demoInstrLabel')).toBe(true);
   });
+  it('contains OpenRouter API key label', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('openrouterKey')).toBe(true);
+  });
 });

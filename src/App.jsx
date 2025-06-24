@@ -173,6 +173,7 @@ const translations = {
     clearData: 'Clear Data',
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
+    openrouterKey: 'OpenRouter API key',
     sheetUrl: 'Google Sheet URL',
     publish: 'Publish',
     googleClientId: 'Google Client ID',
@@ -230,6 +231,7 @@ const translations = {
     clearData: 'Puhasta andmed',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
+    openrouterKey: 'OpenRouter API v\u00f5ti',
     sheetUrl: 'Google Sheeti URL',
     publish: 'Avalda',
     googleClientId: 'Google kliendi ID',
@@ -287,6 +289,7 @@ const translations = {
     clearData: 'Puhasta andmed',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
+    openrouterKey: 'OpenRouter API v\u00f5ti',
     sheetUrl: 'Google Sheeti URL',
     publish: 'Avalda',
     googleClientId: 'Google kliendi ID',
@@ -309,7 +312,7 @@ function useTranslation() {
 }
 
 export default function App({ darkMode, setDarkMode }) {
-  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
+  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '', openrouter: '' });
   const [sheetUrl, setSheetUrl] = useStoredState('sheetUrl', '');
   const [googleClientId, setGoogleClientId] = useStoredState('googleClientId', '');
   const [googleToken, setGoogleToken] = useStoredState('googleToken', '');
@@ -322,6 +325,8 @@ export default function App({ darkMode, setDarkMode }) {
   const [provider, setProvider] = useStoredState('provider', 'openai');
   const [openAiModels, setOpenAiModels] = useState([]);
   const [googleModels, setGoogleModels] = useState([]);
+  const [openRouterModels, setOpenRouterModels] = useState([]);
+  const [openRouterMap, setOpenRouterMap] = useState({});
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
   const [textPrompt, setTextPrompt] = useStoredState('textPrompt', 'Generate a realistic Estonian weather report');
@@ -390,6 +395,9 @@ export default function App({ darkMode, setDarkMode }) {
   }, [texts]);
 
   const textModelsList = [
+    ...openRouterModels
+      .filter(m => !/speech|audio|tts|whisper|transcribe|asr/i.test(m.id))
+      .map(m => ({ id: m.base, provider: 'openrouter' })),
     ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
     ...googleModels.map(m => ({ id: m, provider: 'google' }))
   ];
@@ -449,7 +457,7 @@ export default function App({ darkMode, setDarkMode }) {
     a.src = url;
   });
 
-  const mockMode = !apiKeys.openai && !apiKeys.google;
+  const mockMode = !apiKeys.openai && !apiKeys.google && !apiKeys.openrouter;
 
   const signInGoogle = () => {
     if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
@@ -469,6 +477,37 @@ export default function App({ darkMode, setDarkMode }) {
   };
 
   const signOutGoogle = () => setGoogleToken('');
+
+  useEffect(() => {
+    (async () => {
+      const url = 'https://openrouter.ai/api/v1/models';
+      try {
+        const res = await fetchWithLoading(url);
+        const data = await res.json().catch(() => ({}));
+        addLog('GET', url, '', data);
+        if (!res.ok) throw new Error(data.error?.message || data.detail || 'Failed to fetch OpenRouter models');
+        const models = (data.data || []).map(m => ({ id: m.id, base: m.id.split('/').pop(), pricing: m.pricing?.prompt }));
+        if (models.length) {
+          setOpenRouterModels(models);
+          const map = {};
+          models.forEach(m => { map[m.base] = { id: m.id, pricing: m.pricing?.prompt }; });
+          setOpenRouterMap(map);
+          const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({ id: m.base, name: m.id, cost: m.pricing?.prompt || '', provider: 'openrouter' }));
+          if (tts.length) {
+            setTtsModels(t => [...t.filter(x => !tts.some(v => v.id === x.id)), ...tts]);
+            if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
+          }
+          const asr = models.filter(m => /whisper|asr|speech|transcribe|audio/i.test(m.id)).map(m => ({ id: m.base, name: m.id, provider: 'openrouter' }));
+          if (asr.length) {
+            setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
+            if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
+          }
+        }
+      } catch (e) {
+        showError(e.message);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!apiKeys.openai) return;
@@ -574,7 +613,19 @@ export default function App({ darkMode, setDarkMode }) {
         setTexts(t => [...t, { provider: model, text: mock, prompt: textPrompt, timestamp }]);
         continue;
       }
-      if (googleModels.includes(model)) {
+      if (openRouterMap[model]) {
+        const orModel = openRouterMap[model].id;
+        const body = { model: orModel, messages: [{ role: 'user', content: textPrompt }] };
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+        const url = 'https://openrouter.ai/api/v1/chat/completions';
+        const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        addLog('POST', url, body, data);
+        if (!res.ok) { showError(data.error?.message || 'Text generation failed'); continue; }
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) setTexts(t => [...t, { provider: model, text, prompt: textPrompt, timestamp }]);
+      } else if (googleModels.includes(model)) {
         const body = { prompt: { text: textPrompt } };
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateText?key=${apiKeys.google}`;
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -646,6 +697,24 @@ export default function App({ darkMode, setDarkMode }) {
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
+      } else if (openRouterMap[model]) {
+        const orModel = openRouterMap[model].id;
+        const url = 'https://openrouter.ai/api/v1/audio/speech';
+        const body = { model: orModel, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+        const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          addLog('POST', url, body, err, cost);
+          showError(err.error?.message || 'TTS request failed');
+          continue;
+        }
+        const blob = await res.blob();
+        addLog('POST', url, body, '<audio>', cost);
+        const data = await blobToDataUrl(blob);
+        const duration = await audioDuration(data);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
       } else if (openAiModels.includes(model)) {
         const url = 'https://api.openai.com/v1/audio/speech';
         const body = { model, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
@@ -689,7 +758,26 @@ export default function App({ darkMode, setDarkMode }) {
         finish(text, 'mock');
         continue;
       }
-      if (openAiModels.includes(model)) {
+      if (openRouterMap[model]) {
+        const orModel = openRouterMap[model].id;
+        const form = new FormData();
+        form.append('model', orModel);
+        form.append('file', blob, 'audio.webm');
+        if (asrPrompt) form.append('prompt', asrPrompt);
+        try {
+          const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
+          const headers = {};
+          if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+          const res = await fetchWithLoading(url, { method: 'POST', headers, body: form });
+          const data = await res.json().catch(() => ({}));
+          addLog('POST', url, '<audio>', data);
+          if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
+          const text = data.text?.trim();
+          if (text) finish(text, model);
+        } catch (e) {
+          showError(e.message);
+        }
+      } else if (openAiModels.includes(model)) {
         const form = new FormData();
         form.append('model', model);
         form.append('file', blob, 'audio.webm');
@@ -919,13 +1007,18 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const priceRows = [
-    { id: 0, provider: 'google', model: 'gemini-1.5-flash', price: 0.35 },
-    { id: 1, provider: 'openai', model: 'gpt-3.5-turbo-0125', price: 0.5 },
-    { id: 2, provider: 'openai', model: 'gpt-4o-mini', price: 1 },
-    { id: 3, provider: 'google', model: 'gemini-1.5-pro', price: 3 },
-    { id: 4, provider: 'openai', model: 'gpt-4o', price: 5 }
-  ];
+  const priceRows = React.useMemo(() => {
+    const base = [
+      { id: 0, provider: 'google', model: 'gemini-1.5-flash', price: 0.35 },
+      { id: 1, provider: 'openai', model: 'gpt-3.5-turbo-0125', price: 0.5 },
+      { id: 2, provider: 'openai', model: 'gpt-4o-mini', price: 1 },
+      { id: 3, provider: 'google', model: 'gemini-1.5-pro', price: 3 },
+      { id: 4, provider: 'openai', model: 'gpt-4o', price: 5 }
+    ];
+    const start = base.length;
+    const orRows = openRouterModels.map((m, i) => ({ id: start + i, provider: 'openrouter', model: m.base, price: Number(m.pricing || 0) }));
+    return [...base, ...orRows];
+  }, [openRouterModels]);
   const priceColumns = [
     { field: 'provider', headerName: t('source'), width: 120, renderCell },
     { field: 'model', headerName: t('priceModel'), flex: 1, renderCell },
@@ -1112,6 +1205,14 @@ export default function App({ darkMode, setDarkMode }) {
             type="password"
             value={apiKeys.google}
             onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label={t('openrouterKey')}
+            type="password"
+            value={apiKeys.openrouter}
+            onChange={e => setApiKeys({ ...apiKeys, openrouter: e.target.value })}
             fullWidth
             margin="normal"
           />
