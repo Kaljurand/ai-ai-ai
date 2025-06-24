@@ -395,13 +395,35 @@ export default function App() {
     setErrors(errs => [...errs, msg]);
   };
 
-  const addLog = (method, url, body = '', response = '', cost = '') => {
-    const short = s => {
-      if (!s) return '';
-      if (typeof s !== 'string') s = JSON.stringify(s);
-      return s.length > 60 ? s.slice(0, 30) + '...' + s.slice(-20) : s;
+  const formatLogValue = val => {
+    const replacer = (k, v) => {
+      if (typeof v === 'string') {
+        if (v.startsWith('data:')) return '<audio>';
+        if (v.length > 120) return '<text>';
+      }
+      return v;
     };
-    setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: short(body), response: short(response), cost }]);
+    if (val == null) return '';
+    if (typeof val === 'string') return replacer('', val);
+    try {
+      return JSON.stringify(val, replacer);
+    } catch {
+      return String(val);
+    }
+  };
+
+  const addLog = (method, url, body = '', response = '', cost = '') => {
+    setLogs(l => [
+      ...l,
+      {
+        time: new Date().toISOString(),
+        method,
+        url,
+        body: formatLogValue(body),
+        response: formatLogValue(response),
+        cost
+      }
+    ]);
   };
 
   const fetchWithLoading = async (url, opts) => {
@@ -697,7 +719,9 @@ export default function App() {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
           const data = await res.json().catch(() => ({}));
-          addLog('POST', url, '<audio>', data);
+          const body = { model, file: `<audio>.${ext}` };
+          if (asrPrompt) body.prompt = asrPrompt;
+          addLog('POST', url, body, data);
           if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
           const text = data.text?.trim();
           if (text) finish(text, model);

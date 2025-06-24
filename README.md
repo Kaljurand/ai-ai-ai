@@ -42,6 +42,8 @@ npm test
   the `/v1/audio/transcriptions` endpoint.
 - Uses the original audio MIME type to set the file extension when
   uploading to the transcription endpoint.
+- The Log tab now records complete request and response bodies,
+  replacing long audio or text fields with `<audio>` or `<text>` for easier debugging.
 - View latest model pricing information in a dedicated tab.
 
 This is not a production-ready system but demonstrates the flow described in the specification.

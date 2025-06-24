@@ -26,4 +26,9 @@ describe('App.jsx compilation', () => {
     expect(code.includes('mimeMatch')).toBe(true);
     expect(code.includes('audio.${ext}')).toBe(true);
   });
+  it('formats log values', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('formatLogValue')).toBe(true);
+    expect(code.includes('<text>')).toBe(true);
+  });
 });
