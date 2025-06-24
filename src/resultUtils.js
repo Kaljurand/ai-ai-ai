@@ -9,6 +9,15 @@ export function transcriptsToRows(transcripts, audios, texts) {
     const transcription = t.text;
     const wer = wordErrorRate(orig, transcription);
     const diff = txt ? diffWordsHtml(orig, transcription) : transcription;
-    return { i: i + 1, model: t.provider, original: orig, transcription, wer, diff };
+    return {
+      i: i + 1,
+      original: orig,
+      transcription,
+      wer,
+      diff,
+      textSource: txt?.provider || '',
+      audioSource: audio?.provider || '',
+      asrSource: t.provider
+    };
   });
 }

@@ -11,6 +11,9 @@ describe('transcriptsToRows', () => {
     ];
     const rows = transcriptsToRows(transcripts, audios, texts);
     expect(rows[0].wer).toBe('0.00');
+    expect(rows[0].textSource).toBe('t1');
+    expect(rows[0].audioSource).toBe('a1');
+    expect(rows[0].asrSource).toBe('mock');
     expect(rows[1].wer).toBe('1.00');
   });
 });
