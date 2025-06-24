@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PlaygroundIcon from './PlaygroundIcon';
 import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
+import { transcriptsToRows } from './resultUtils';
 import {
   Button,
   IconButton,
@@ -630,15 +631,15 @@ export default function App() {
     }
     const sheetId = idMatch[1];
     const audio = audios[tr.aIndex];
-    const txt = texts[audio.index];
+    const txt = audio ? texts[audio.index] : null;
     const row = [
-      tr.timestamp || audio.timestamp || new Date().toISOString(),
+      tr.timestamp || audio?.timestamp || new Date().toISOString(),
       tr.provider,
-      audio.provider,
-      txt.provider,
-      txt.text,
+      audio?.provider || '',
+      txt?.provider || '',
+      txt?.text || '',
       tr.text,
-      wordErrorRate(txt.text, tr.text)
+      txt ? wordErrorRate(txt.text, tr.text) : 1
     ];
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append?valueInputOption=USER_ENTERED&key=${apiKeys.google}`;
     const body = { values: [row] };
@@ -671,13 +672,7 @@ export default function App() {
     setTexts([]); setAudios([]); setTranscripts([]);
   };
 
-  const rows = transcripts.map((t, i) => {
-    const audio = audios[t.aIndex];
-    const txt = texts[audio.index];
-    const wer = wordErrorRate(txt.text, t.text);
-    const diff = diffWordsHtml(txt.text, t.text);
-    return { i: i + 1, model: t.provider, original: txt.text, transcription: t.text, wer, diff };
-  });
+  const rows = transcriptsToRows(transcripts, audios, texts);
 
   const textRows = texts.map((txt, i) => ({ id: i, ...txt })).filter(r => r.provider !== 'tts');
   const textColumns = [
