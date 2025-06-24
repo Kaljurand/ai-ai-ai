@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PlaygroundIcon from './PlaygroundIcon';
 import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
 import {
@@ -702,6 +703,7 @@ export default function App() {
     <>
       <AppBar position="fixed">
         <Toolbar>
+          <PlaygroundIcon sx={{ mr: 1 }} />
           <Typography variant="h6" sx={{ flexGrow: 1 }}>{t('appTitle')}</Typography>
           <Tabs value={view} onChange={(e, v) => setView(v)} textColor="inherit" indicatorColor="secondary">
             <Tab value="text" label={t('tabText')} />
@@ -776,7 +778,6 @@ export default function App() {
       )}
       {view === 'asr' && (
         <div style={{ padding: '1rem' }}>
-          <Typography variant="h6">{t('tabAsr')}</Typography>
           <Select multiple value={selectedAsrModels} onChange={e => setSelectedAsrModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {asrModels.map(m => (
               <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
@@ -797,7 +798,6 @@ export default function App() {
       )}
       {view === 'log' && (
         <div style={{ padding: '1rem' }}>
-          <Typography variant="h6">{t('tabLog')}</Typography>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={logRows} columns={logColumns} name="logs" t={t} />
           <PersistedGrid
@@ -809,7 +809,6 @@ export default function App() {
       )}
       {view === 'config' && (
         <div style={{ padding: '1rem' }}>
-          <Typography variant="h6">{t('tabSettings')}</Typography>
           <TextField
             label={t('openaiKey')}
             type="password"
