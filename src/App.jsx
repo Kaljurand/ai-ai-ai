@@ -689,7 +689,12 @@ export default function App() {
             rows={audios.map((a, i) => ({ id: i, ...a, _index: i }))}
             columns={[
               { field: 'timestamp', headerName: t('timestamp'), width: 180 },
-              { field: 'index', headerName: t('textId'), width: 80, valueGetter: params => params.row.index + 1 },
+              {
+                field: 'index',
+                headerName: t('textId'),
+                width: 80,
+                valueGetter: params => (params.row && params.row.index != null ? params.row.index + 1 : ''),
+              },
               { field: 'provider', headerName: t('source'), width: 120 },
               {
                 field: 'audio',
