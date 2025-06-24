@@ -16,4 +16,24 @@ describe('App.jsx compilation', () => {
     expect(code.includes('gpt-4o-mini-tts')).toBe(true);
     expect(code.includes('tabPrices')).toBe(true);
   });
+  it('includes new ASR models', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('gpt-4o-transcribe')).toBe(true);
+    expect(code.includes('gpt-4o-mini-transcribe')).toBe(true);
+  });
+  it('uses audio MIME type when uploading', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('mimeMatch')).toBe(true);
+    expect(code.includes('<audio>.${ext}')).toBe(true);
+    expect(code.includes('new File')).toBe(true);
+  });
+  it('formats log values', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('formatLogValue')).toBe(true);
+    expect(code.includes('<text>')).toBe(true);
+  });
+  it('uses OpenAI client for transcription', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('openaiRef.current.audio.transcriptions.create')).toBe(true);
+  });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PlaygroundIcon from './PlaygroundIcon';
 import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
@@ -28,6 +28,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
+import OpenAI from 'openai';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -314,6 +315,7 @@ export default function App() {
   const [status, setStatus] = useState('');
   const [provider, setProvider] = useStoredState('provider', 'openai');
   const [openAiModels, setOpenAiModels] = useState([]);
+  const openaiRef = useRef(null);
   const [googleModels, setGoogleModels] = useState([]);
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
@@ -395,13 +397,35 @@ export default function App() {
     setErrors(errs => [...errs, msg]);
   };
 
-  const addLog = (method, url, body = '', response = '', cost = '') => {
-    const short = s => {
-      if (!s) return '';
-      if (typeof s !== 'string') s = JSON.stringify(s);
-      return s.length > 60 ? s.slice(0, 30) + '...' + s.slice(-20) : s;
+  const formatLogValue = val => {
+    const replacer = (k, v) => {
+      if (typeof v === 'string') {
+        if (v.startsWith('data:')) return '<audio>';
+        if (v.length > 120) return '<text>';
+      }
+      return v;
     };
-    setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: short(body), response: short(response), cost }]);
+    if (val == null) return '';
+    if (typeof val === 'string') return replacer('', val);
+    try {
+      return JSON.stringify(val, replacer);
+    } catch {
+      return String(val);
+    }
+  };
+
+  const addLog = (method, url, body = '', response = '', cost = '') => {
+    setLogs(l => [
+      ...l,
+      {
+        time: new Date().toISOString(),
+        method,
+        url,
+        body: formatLogValue(body),
+        response: formatLogValue(response),
+        cost
+      }
+    ]);
   };
 
   const fetchWithLoading = async (url, opts) => {
@@ -465,8 +489,10 @@ export default function App() {
         const data = await res.json().catch(() => ({}));
         addLog('GET', url, '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch OpenAI models');
-        const models = data.data?.map(m => m.id).sort();
-        if (models?.length) {
+        const models = data.data?.map(m => m.id).sort() || [];
+        if (!models.includes('gpt-4o-transcribe')) models.push('gpt-4o-transcribe');
+        if (!models.includes('gpt-4o-mini-transcribe')) models.push('gpt-4o-mini-transcribe');
+        if (models.length) {
           setOpenAiModels(models);
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
@@ -478,8 +504,14 @@ export default function App() {
           setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !tts.some(v => v.id === x.id)), ...tts]);
           if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
         }
-        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id, provider: 'openai' }));
-        if (asr?.length) {
+        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id, provider: 'openai' })) || [];
+        if (!asr.some(m => m.id === 'gpt-4o-transcribe')) {
+          asr.push({ id: 'gpt-4o-transcribe', name: 'gpt-4o-transcribe', provider: 'openai' });
+        }
+        if (!asr.some(m => m.id === 'gpt-4o-mini-transcribe')) {
+          asr.push({ id: 'gpt-4o-mini-transcribe', name: 'gpt-4o-mini-transcribe', provider: 'openai' });
+        }
+        if (asr.length) {
           setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
           if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
         }
@@ -487,6 +519,14 @@ export default function App() {
         showError(e.message);
       }
     })();
+  }, [apiKeys.openai]);
+
+  useEffect(() => {
+    if (apiKeys.openai) {
+      openaiRef.current = new OpenAI({ apiKey: apiKeys.openai, dangerouslyAllowBrowser: true });
+    } else {
+      openaiRef.current = null;
+    }
   }, [apiKeys.openai]);
 
 
@@ -675,17 +715,21 @@ export default function App() {
         finish(text, 'mock');
         continue;
       }
-      if (openAiModels.includes(model)) {
-        const form = new FormData();
-        form.append('model', model);
-        form.append('file', blob, 'audio.webm');
-        if (asrPrompt) form.append('prompt', asrPrompt);
+      if (openAiModels.includes(model) && openaiRef.current) {
+        const mimeMatch = (audio.data || audio.url).match(/^data:([^;]+);/);
+        let ext = 'webm';
+        if (mimeMatch) {
+          ext = mimeMatch[1].split('/')[1].split(';')[0];
+        }
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
-          const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
-          const data = await res.json().catch(() => ({}));
-          addLog('POST', url, '<audio>', data);
-          if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
+          const file = new File([blob], `audio.${ext}`);
+          const options = { file, model };
+          if (asrPrompt) options.prompt = asrPrompt;
+          const data = await openaiRef.current.audio.transcriptions.create(options);
+          const body = { model, file: `<audio>.${ext}` };
+          if (asrPrompt) body.prompt = asrPrompt;
+          addLog('POST', url, body, data);
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {
