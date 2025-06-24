@@ -1024,14 +1024,19 @@ export default function App({ darkMode, setDarkMode }) {
 
   const modelRows = React.useMemo(
     () =>
-      openRouterModels.map((m, i) => ({
-        id: i,
-        modelId: m.id,
-        name: m.name,
-        description: m.description,
-        modality: m.architecture?.modality || '',
-        pricing: JSON.stringify(m.pricing || {})
-      })),
+      openRouterModels.map((m, i) => {
+        const prompt = parseFloat(m.pricing?.prompt || 0);
+        const completion = parseFloat(m.pricing?.completion || 0);
+        const pricing = prompt + completion;
+        return {
+          id: i,
+          modelId: m.id,
+          name: m.name,
+          description: m.description,
+          modality: m.architecture?.modality || '',
+          pricing: pricing || ''
+        };
+      }),
     [openRouterModels]
   );
   const modelColumns = [
