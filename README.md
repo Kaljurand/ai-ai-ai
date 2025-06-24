@@ -38,6 +38,8 @@ npm test
 - Publish individual ASR result rows to a configurable Google Sheet.
 - Publishing requires signing in with Google using an OAuth client ID.
 - Results are persisted in browser local storage.
+- Supports OpenAI `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` models via
+  the `/v1/audio/transcriptions` endpoint.
 - View latest model pricing information in a dedicated tab.
 
 This is not a production-ready system but demonstrates the flow described in the specification.

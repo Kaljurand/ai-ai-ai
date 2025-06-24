@@ -16,4 +16,9 @@ describe('App.jsx compilation', () => {
     expect(code.includes('gpt-4o-mini-tts')).toBe(true);
     expect(code.includes('tabPrices')).toBe(true);
   });
+  it('includes new ASR models', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('gpt-4o-transcribe')).toBe(true);
+    expect(code.includes('gpt-4o-mini-transcribe')).toBe(true);
+  });
 });

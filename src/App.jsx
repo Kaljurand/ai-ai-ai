@@ -478,8 +478,14 @@ export default function App() {
           setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !tts.some(v => v.id === x.id)), ...tts]);
           if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
         }
-        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id, provider: 'openai' }));
-        if (asr?.length) {
+        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id, provider: 'openai' })) || [];
+        if (!asr.some(m => m.id === 'gpt-4o-transcribe')) {
+          asr.push({ id: 'gpt-4o-transcribe', name: 'gpt-4o-transcribe', provider: 'openai' });
+        }
+        if (!asr.some(m => m.id === 'gpt-4o-mini-transcribe')) {
+          asr.push({ id: 'gpt-4o-mini-transcribe', name: 'gpt-4o-mini-transcribe', provider: 'openai' });
+        }
+        if (asr.length) {
           setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
           if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
         }
