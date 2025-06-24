@@ -21,10 +21,12 @@ import {
   ListItemText,
   CircularProgress,
   Box,
+  Divider,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { DataGrid } from '@mui/x-data-grid';
+import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -69,7 +71,9 @@ function PersistedGrid({ storageKey, ...props }) {
   return (
     <DataGrid
       autoHeight
+      getRowHeight={() => 'auto'}
       disableRowSelectionOnClick
+      sx={{ '& .MuiDataGrid-cell': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}
       sortingOrder={['asc', 'desc']}
       sortModel={sortModel}
       onSortModelChange={setSortModel}
@@ -79,6 +83,35 @@ function PersistedGrid({ storageKey, ...props }) {
       onColumnVisibilityModelChange={setCols}
       {...props}
     />
+  );
+}
+
+function renderCell(params) {
+  const val = params.value == null ? '' : String(params.value);
+  return (
+    <Tooltip title={val} placement="top">
+      <span style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{val}</span>
+    </Tooltip>
+  );
+}
+
+function renderHtmlCell(params) {
+  const text = (params.value || '').replace(/<[^>]+>/g, '');
+  return (
+    <Tooltip title={text} placement="top">
+      <span style={{ whiteSpace: 'normal', wordWrap: 'break-word' }} dangerouslySetInnerHTML={{ __html: params.value }} />
+    </Tooltip>
+  );
+}
+
+function ExportButtons({ rows, columns, name, t, children }) {
+  return (
+    <Box sx={{ mb: 1 }}>
+      <Button onClick={() => download(rowsToJSON(rows, columns), 'application/json', `${name}.json`)}>{t('exportJSON')}</Button>
+      <Button onClick={() => download(rowsToCSV(rows, columns), 'text/csv', `${name}.csv`)} sx={{ ml: 1 }}>{t('exportCSV')}</Button>
+      <Button onClick={() => download(rowsToMarkdown(rows, columns), 'text/markdown', `${name}.md`)} sx={{ ml: 1 }}>{t('exportMD')}</Button>
+      {children}
+    </Box>
   );
 }
 
@@ -566,37 +599,6 @@ export default function App() {
     setTexts([]); setAudios([]); setTranscripts([]);
   };
 
-  const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'results.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportCSV = () => {
-    const header = 'index,model,original,transcription,wer\n';
-    const lines = rows.map(r => `${r.i},${r.model},"${r.original}","${r.transcription}",${r.wer}`).join('\n');
-    const blob = new Blob([header + lines], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'results.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportMD = () => {
-    const header = `|${t('transcriptId')}|${t('originalText')}|${t('transcript')}|${t('wer')}|\n|---|---|---|---|\n`;
-    const lines = rows.map(r => `|${r.i}|${r.original}|${r.transcription}|${r.wer}|`).join('\n');
-    const blob = new Blob([header + lines], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'results.md';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const rows = transcripts.map((t, i) => {
     const audio = audios[t.aIndex];
     const txt = texts[audio.index];
@@ -604,6 +606,96 @@ export default function App() {
     const diff = diffWordsHtml(txt.text, t.text);
     return { i: i + 1, model: t.provider, original: txt.text, transcription: t.text, wer, diff };
   });
+
+  const textRows = texts.map((txt, i) => ({ id: i, ...txt })).filter(r => r.provider !== 'tts');
+  const textColumns = [
+    { field: 'id', headerName: t('textId'), width: 70, valueGetter: p => (p.row && p.row.id != null ? p.row.id + 1 : '') , renderCell },
+    { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell },
+    { field: 'text', headerName: t('text'), flex: 1, renderCell },
+    { field: 'provider', headerName: t('source'), width: 120, renderCell },
+    {
+      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 150,
+      renderCell: params => (
+        <>
+          <Tooltip title={t('useText')}>
+            <IconButton onClick={() => { setSelectedTextId(params.row.id); setTtsPrompt(params.row.text); setView('audio'); }} size="small">
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={t('delete')}>
+            <IconButton onClick={() => deleteText(params.row.id)} size="small" color="error">
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </>
+      )
+    }
+  ];
+
+  const audioRows = audios.map((a, i) => ({ id: i, ...a, _index: i }));
+  const audioColumns = [
+    { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell },
+    { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell },
+    { field: 'provider', headerName: t('source'), width: 120, renderCell },
+    { field: 'audio', headerName: t('audio'), flex: 1, renderCell: p => p.row.url && <audio controls src={p.row.url}></audio> },
+    {
+      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 160,
+      renderCell: params => (
+        <>
+          <Tooltip title={t('toAsr')}>
+            <IconButton onClick={() => transcribe(params.row._index)} size="small">
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={t('delete')}>
+            <IconButton onClick={() => deleteAudio(params.row._index)} size="small" color="error">
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </>
+      )
+    }
+  ];
+
+  const resultRows = rows.map((r, idx) => ({ id: idx, ...r, _index: idx }));
+  const resultColumns = [
+    { field: 'i', headerName: t('transcriptId'), width: 70, renderCell },
+    { field: 'model', headerName: t('source'), width: 140, renderCell },
+    { field: 'original', headerName: t('originalText'), flex: 1, renderCell },
+    { field: 'transcription', headerName: t('transcript'), flex: 1, renderCell },
+    { field: 'wer', headerName: t('wer'), width: 90, renderCell },
+    { field: 'diff', headerName: t('diff'), flex: 1, renderCell: renderHtmlCell },
+    {
+      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 120,
+      renderCell: params => (
+        <Tooltip title={t('delete')}>
+          <IconButton onClick={() => deleteTranscript(params.row._index)} size="small" color="error">
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )
+    }
+  ];
+
+  const logRows = logs.map((l, i) => ({ id: i, ...l }));
+  const logColumns = [
+    { field: 'time', headerName: t('timestamp'), width: 180, renderCell },
+    { field: 'method', headerName: t('actions'), width: 100, renderCell },
+    { field: 'url', headerName: 'Endpoint', flex: 1, renderCell },
+    { field: 'body', headerName: 'Body', flex: 1, renderCell },
+    { field: 'response', headerName: 'Response', flex: 1, renderCell },
+    { field: 'cost', headerName: 'Cost', width: 100, renderCell },
+    {
+      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 120,
+      renderCell: params => (
+        <Tooltip title={t('delete')}>
+          <IconButton onClick={() => deleteLog(params.row.id)} size="small" color="error">
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )
+    }
+  ];
 
 
   return (
@@ -646,37 +738,12 @@ export default function App() {
               </ListItem>
             ))}
           </List>
+          <Divider sx={{ my: 2 }} />
+          <ExportButtons rows={textRows} columns={textColumns} name="texts" t={t} />
           <PersistedGrid
             storageKey="texts"
-            rows={texts.map((txt, i) => ({ id: i, ...txt }))}
-            columns={[
-              { field: 'id', headerName: t('textId'), width: 70,
-                valueGetter: params => (params.row && params.row.id != null ? params.row.id + 1 : '') },
-              { field: 'timestamp', headerName: t('timestamp'), width: 180 },
-              { field: 'text', headerName: t('text'), flex: 1 },
-              { field: 'provider', headerName: t('source'), width: 120 },
-              {
-                field: 'actions',
-                headerName: t('actions'),
-                sortable: false,
-                filterable: false,
-                width: 150,
-                renderCell: params => (
-                  <>
-                    <Tooltip title={t('useText')}>
-                      <IconButton onClick={() => { setSelectedTextId(params.row.id); setTtsPrompt(params.row.text); setView('audio'); }} size="small">
-                        <ArrowForwardIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={t('delete')}>
-                      <IconButton onClick={() => deleteText(params.row.id)} size="small" color="error">
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </>
-                )
-              }
-            ]}
+            rows={textRows}
+            columns={textColumns}
           />
         </div>
       )}
@@ -697,46 +764,12 @@ export default function App() {
           <Button onClick={recording ? stopRecording : startRecording} sx={{ mt: 1, ml: 1 }}>
             {recording ? t('stopRecording') : t('recordAudio')}
           </Button>
+          <Divider sx={{ my: 2 }} />
+          <ExportButtons rows={audioRows} columns={audioColumns} name="audios" t={t} />
           <PersistedGrid
             storageKey="audios"
-            rows={audios.map((a, i) => ({ id: i, ...a, _index: i }))}
-            columns={[
-              { field: 'timestamp', headerName: t('timestamp'), width: 180 },
-              {
-                field: 'index',
-                headerName: t('textId'),
-                width: 80,
-                valueGetter: params => (params.row && params.row.index != null ? params.row.index + 1 : ''),
-              },
-              { field: 'provider', headerName: t('source'), width: 120 },
-              {
-                field: 'audio',
-                headerName: t('audio'),
-                flex: 1,
-                renderCell: params => params.row.url && <audio controls src={params.row.url}></audio>
-              },
-              {
-                field: 'actions',
-                headerName: t('actions'),
-                sortable: false,
-                filterable: false,
-                width: 160,
-                renderCell: params => (
-                  <>
-                    <Tooltip title={t('toAsr')}>
-                      <IconButton onClick={() => transcribe(params.row._index)} size="small">
-                        <ArrowForwardIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={t('delete')}>
-                      <IconButton onClick={() => deleteAudio(params.row._index)} size="small" color="error">
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </>
-                )
-              }
-            ]}
+            rows={audioRows}
+            columns={audioColumns}
           />
           {status && <p>{status}</p>}
         </div>
@@ -750,40 +783,14 @@ export default function App() {
             ))}
           </Select>
           <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
-          <Button onClick={exportJSON}>{t('exportJSON')}</Button>
-          <Button onClick={exportCSV}>{t('exportCSV')}</Button>
-          <Button onClick={exportMD}>{t('exportMD')}</Button>
-          <Button onClick={clearData}>{t('clearData')}</Button>
+          <Divider sx={{ my: 2 }} />
+          <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t}>
+            <Button onClick={clearData} sx={{ ml: 1 }}>{t('clearData')}</Button>
+          </ExportButtons>
           <PersistedGrid
             storageKey="results"
-            rows={rows.map((r, idx) => ({ id: idx, ...r, _index: idx }))}
-            columns={[
-              { field: 'i', headerName: t('transcriptId'), width: 70 },
-              { field: 'model', headerName: t('source'), width: 140 },
-              { field: 'original', headerName: t('originalText'), flex: 1 },
-              { field: 'transcription', headerName: t('transcript'), flex: 1 },
-              { field: 'wer', headerName: t('wer'), width: 90 },
-              {
-                field: 'diff',
-                headerName: t('diff'),
-                flex: 1,
-                renderCell: params => <span dangerouslySetInnerHTML={{ __html: params.value }} />,
-              },
-              {
-                field: 'actions',
-                headerName: t('actions'),
-                sortable: false,
-                filterable: false,
-                width: 120,
-                renderCell: params => (
-                  <Tooltip title={t('delete')}>
-                    <IconButton onClick={() => deleteTranscript(params.row._index)} size="small" color="error">
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                ),
-              },
-            ]}
+            rows={resultRows}
+            columns={resultColumns}
           />
           {status && <p>{status}</p>}
         </div>
@@ -791,31 +798,12 @@ export default function App() {
       {view === 'log' && (
         <div style={{ padding: '1rem' }}>
           <Typography variant="h6">{t('tabLog')}</Typography>
+          <Divider sx={{ my: 2 }} />
+          <ExportButtons rows={logRows} columns={logColumns} name="logs" t={t} />
           <PersistedGrid
             storageKey="logs"
-            rows={logs.map((l, i) => ({ id: i, ...l }))}
-            columns={[
-              { field: 'time', headerName: t('timestamp'), width: 180 },
-              { field: 'method', headerName: t('actions'), width: 100 },
-              { field: 'url', headerName: 'Endpoint', flex: 1 },
-              { field: 'body', headerName: 'Body', flex: 1 },
-              { field: 'response', headerName: 'Response', flex: 1 },
-              { field: 'cost', headerName: 'Cost', width: 100 },
-              {
-                field: 'actions',
-                headerName: t('actions'),
-                sortable: false,
-                filterable: false,
-                width: 120,
-                renderCell: params => (
-                  <Tooltip title={t('delete')}>
-                    <IconButton onClick={() => deleteLog(params.row.id)} size="small" color="error">
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                ),
-              }
-            ]}
+            rows={logRows}
+            columns={logColumns}
           />
         </div>
       )}
