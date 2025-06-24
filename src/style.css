@@ -4,6 +4,7 @@ table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
 th, td { border: 1px solid #ccc; padding: 0.25rem; }
 .insert { background-color: #dfd; }
 .delete { background-color: #fdd; text-decoration: line-through; }
+.monospace { font-family: monospace; }
 .error-bar {
   position: fixed;
   bottom: 0;

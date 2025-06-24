@@ -92,10 +92,17 @@ function PersistedGrid({ storageKey, ...props }) {
 }
 
 function renderCell(params) {
-  const val = params.value == null ? '' : String(params.value);
+  let val = params.value == null ? '' : String(params.value);
+  if (/^\d{4}-\d{2}-\d{2}T/.test(val)) {
+    val = val.replace('T', ' ').slice(0, 19);
+  }
+  const style = { whiteSpace: 'normal', wordWrap: 'break-word' };
+  if (['timestamp', 'time', 'provider', 'textSource', 'audioSource', 'asrSource', 'wer'].includes(params.field)) {
+    style.fontFamily = 'monospace';
+  }
   return (
     <Tooltip title={val} placement="top">
-      <span style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{val}</span>
+      <span style={style}>{val}</span>
     </Tooltip>
   );
 }
@@ -112,9 +119,9 @@ function renderHtmlCell(params) {
 function ExportButtons({ rows, columns, name, t, children }) {
   return (
     <Box sx={{ mb: 1 }}>
-      <Button onClick={() => download(rowsToJSON(rows, columns), 'application/json', `${name}.json`)}>{t('exportJSON')}</Button>
-      <Button onClick={() => download(rowsToCSV(rows, columns), 'text/csv', `${name}.csv`)} sx={{ ml: 1 }}>{t('exportCSV')}</Button>
-      <Button onClick={() => download(rowsToMarkdown(rows, columns), 'text/markdown', `${name}.md`)} sx={{ ml: 1 }}>{t('exportMD')}</Button>
+      <Button size="small" onClick={() => download(rowsToJSON(rows, columns), 'application/json', `${name}.json`)}>{t('exportJSON')}</Button>
+      <Button size="small" onClick={() => download(rowsToCSV(rows, columns), 'text/csv', `${name}.csv`)} sx={{ ml: 1 }}>{t('exportCSV')}</Button>
+      <Button size="small" onClick={() => download(rowsToMarkdown(rows, columns), 'text/markdown', `${name}.md`)} sx={{ ml: 1 }}>{t('exportMD')}</Button>
       {children}
     </Box>
   );
@@ -139,7 +146,7 @@ const translations = {
     source: 'Source',
     ttsPromptLabel: 'Text',
     generateAudio: 'Generate Audio',
-    metaPromptLabel: 'Meta prompt',
+    metaPromptLabel: 'Instructions',
     uploadAudio: 'Upload Audio',
     recordAudio: 'Record Audio',
     stopRecording: 'Stop Recording',
@@ -191,7 +198,7 @@ const translations = {
     source: 'Allikas',
     ttsPromptLabel: 'Tekst',
     generateAudio: 'Genereeri heli',
-    metaPromptLabel: 'Metaprompt',
+    metaPromptLabel: 'Juhised',
     uploadAudio: 'Laadi heli',
     recordAudio: 'Salvesta heli',
     stopRecording: 'Peata salvestus',
@@ -243,7 +250,7 @@ const translations = {
     source: 'Allikas',
     ttsPromptLabel: 'Tekst',
     generateAudio: 'Genereeri h\u00e4\u00e4l',
-    metaPromptLabel: 'Metaprompt',
+    metaPromptLabel: 'Juhised',
     uploadAudio: 'Laadi h\u00e4\u00e4l',
     recordAudio: 'Salvesta h\u00e4\u00e4l',
     stopRecording: 'Peata salvestus',
@@ -911,9 +918,16 @@ export default function App() {
       <div style={{ paddingTop: '64px' }}>
       {view === 'text' && (
         <div style={{ padding: '1rem' }}>
-          <Select multiple value={selectedTextModels} onChange={e => setSelectedTextModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
+          <Select
+            multiple
+            value={selectedTextModels}
+            onChange={e => setSelectedTextModels(e.target.value)}
+            fullWidth
+            renderValue={s => s.join(', ')}
+            sx={{ fontFamily: 'monospace' }}
+          >
             {textModelsList.map(m => (
-              <MenuItem key={m.id} value={m.id}>{`${m.provider} ${m.id}`}</MenuItem>
+              <MenuItem key={m.id} value={m.id} sx={{ fontFamily: 'monospace' }}>{`${m.provider} ${m.id}`}</MenuItem>
             ))}
           </Select>
           <Select
@@ -929,7 +943,7 @@ export default function App() {
             ))}
           </Select>
           <TextField label={t('promptForModels')} multiline rows={3} value={textPrompt} onChange={e => setTextPrompt(e.target.value)} fullWidth margin="normal" />
-          <Button onClick={generateTexts}>{t('genPrompt')}</Button>
+          <Button size="small" onClick={generateTexts}>{t('genPrompt')}</Button>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={textRows} columns={textColumns} name="texts" t={t} />
           <PersistedGrid
@@ -941,19 +955,35 @@ export default function App() {
       )}
       {view === 'audio' && (
         <div style={{ padding: '1rem' }}>
-          <TextField label={t('metaPromptLabel')} multiline rows={2} value={ttsMetaPrompt} onChange={e => setTtsMetaPrompt(e.target.value)} fullWidth margin="normal" />
+          <TextField
+            label={t('metaPromptLabel')}
+            multiline
+            rows={2}
+            value={ttsMetaPrompt}
+            onChange={e => setTtsMetaPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+            placeholder="Read the following text as a very fast and energetic sports reporter, kind of like Gunnar Hololei"
+          />
           <TextField label={t('ttsPromptLabel')} multiline rows={4} value={ttsPrompt} InputProps={{ readOnly: true }} fullWidth margin="normal" />
-          <Select multiple value={selectedTtsModels} onChange={e => setSelectedTtsModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
+          <Select
+            multiple
+            value={selectedTtsModels}
+            onChange={e => setSelectedTtsModels(e.target.value)}
+            fullWidth
+            renderValue={s => s.join(', ')}
+            sx={{ fontFamily: 'monospace' }}
+          >
             {ttsModels.map(m => (
-              <MenuItem key={m.id} value={m.id}>{`${m.provider} ${m.name}${m.cost ? ' (' + m.cost + ')' : ''}`}</MenuItem>
+              <MenuItem key={m.id} value={m.id} sx={{ fontFamily: 'monospace' }}>{`${m.provider} ${m.name}${m.cost ? ' (' + m.cost + ')' : ''}`}</MenuItem>
             ))}
           </Select>
-          <Button variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
-          <Button component="label" sx={{ mt: 1, ml: 1 }}>
+          <Button size="small" variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
+          <Button size="small" component="label" sx={{ mt: 1, ml: 1 }}>
             {t('uploadAudio')}
             <input type="file" accept="audio/*" hidden onChange={e => uploadAudio(e.target.files[0])} />
           </Button>
-          <Button onClick={recording ? stopRecording : startRecording} sx={{ mt: 1, ml: 1 }}>
+          <Button size="small" onClick={recording ? stopRecording : startRecording} sx={{ mt: 1, ml: 1 }}>
             {recording ? t('stopRecording') : t('recordAudio')}
           </Button>
           <Divider sx={{ my: 2 }} />
@@ -968,15 +998,22 @@ export default function App() {
       )}
       {view === 'asr' && (
         <div style={{ padding: '1rem' }}>
-          <Select multiple value={selectedAsrModels} onChange={e => setSelectedAsrModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
+          <Select
+            multiple
+            value={selectedAsrModels}
+            onChange={e => setSelectedAsrModels(e.target.value)}
+            fullWidth
+            renderValue={s => s.join(', ')}
+            sx={{ fontFamily: 'monospace' }}
+          >
             {asrModels.map(m => (
-              <MenuItem key={m.id} value={m.id}>{`${m.provider} ${m.name}`}</MenuItem>
+              <MenuItem key={m.id} value={m.id} sx={{ fontFamily: 'monospace' }}>{`${m.provider} ${m.name}`}</MenuItem>
             ))}
           </Select>
           <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t}>
-            <Button onClick={clearData} sx={{ ml: 1 }}>{t('clearData')}</Button>
+            <Button size="small" onClick={clearData} sx={{ ml: 1 }}>{t('clearData')}</Button>
           </ExportButtons>
           <PersistedGrid
             storageKey="results"
@@ -1030,9 +1067,9 @@ export default function App() {
             margin="normal"
           />
           {googleToken ? (
-            <Button onClick={signOutGoogle} sx={{ mt: 1 }}>{t('signOut')}</Button>
+            <Button size="small" onClick={signOutGoogle} sx={{ mt: 1 }}>{t('signOut')}</Button>
           ) : (
-            <Button onClick={signInGoogle} sx={{ mt: 1 }}>{t('signIn')}</Button>
+            <Button size="small" onClick={signInGoogle} sx={{ mt: 1 }}>{t('signIn')}</Button>
           )}
           <Select value={lang} onChange={e => setLang(e.target.value)} fullWidth sx={{ mt: 1 }}>
             <MenuItem value="en">English</MenuItem>
