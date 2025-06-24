@@ -40,6 +40,8 @@ npm test
 - Results are persisted in browser local storage.
 - Supports OpenAI `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` models via
   the `/v1/audio/transcriptions` endpoint.
+- Uses the original audio MIME type to set the file extension when
+  uploading to the transcription endpoint.
 - View latest model pricing information in a dedicated tab.
 
 This is not a production-ready system but demonstrates the flow described in the specification.

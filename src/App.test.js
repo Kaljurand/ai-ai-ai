@@ -21,4 +21,9 @@ describe('App.jsx compilation', () => {
     expect(code.includes('gpt-4o-transcribe')).toBe(true);
     expect(code.includes('gpt-4o-mini-transcribe')).toBe(true);
   });
+  it('uses audio MIME type when uploading', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('mimeMatch')).toBe(true);
+    expect(code.includes('audio.${ext}')).toBe(true);
+  });
 });

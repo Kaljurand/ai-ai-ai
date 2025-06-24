@@ -686,7 +686,12 @@ export default function App() {
       if (openAiModels.includes(model)) {
         const form = new FormData();
         form.append('model', model);
-        form.append('file', blob, 'audio.webm');
+        const mimeMatch = (audio.data || audio.url).match(/^data:([^;]+);/);
+        let ext = 'webm';
+        if (mimeMatch) {
+          ext = mimeMatch[1].split('/')[1].split(';')[0];
+        }
+        form.append('file', blob, `audio.${ext}`);
         if (asrPrompt) form.append('prompt', asrPrompt);
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
