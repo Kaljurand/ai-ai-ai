@@ -16,13 +16,13 @@ import {
   Tab,
   Checkbox,
   FormControlLabel,
-  Snackbar,
   CircularProgress,
   Box,
   Divider,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
 
@@ -32,7 +32,11 @@ function useStoredState(key, initial) {
     return stored ? JSON.parse(stored) : initial;
   });
   useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(state));
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent('storageError', { detail: { key, error: e } }));
+    }
   }, [key, state]);
   return [state, setState];
 }
@@ -154,7 +158,9 @@ const translations = {
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
     language: 'Language',
-    mockMode: 'Mock mode active: no API key'
+    mockMode: 'Mock mode active: no API key',
+    close: 'Close',
+    storageFailed: 'Not stored'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -196,7 +202,9 @@ const translations = {
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     language: 'Keel',
-    mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub'
+    mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
+    close: 'Sulge',
+    storageFailed: 'Salvestus eba\u00f5nnestus'
   }
 };
 
@@ -235,7 +243,7 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const [loadingCount, setLoadingCount] = useState(0);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errors, setErrors] = useState([]);
   const [logs, setLogs] = useStoredState('logs', []);
 
   const predefinedPrompts = [
@@ -247,6 +255,23 @@ export default function App() {
     'r\u00e4pi midagi Kaarel Kose stiilis',
     'loetle Eesti p\u00e4risnimesid, mis ainsuse nimetavas on kolmandas v\u00e4ltes, aga esita need mitmuse kaasa\u00fctlevas'
   ];
+
+  useEffect(() => {
+    const handler = e => {
+      const { key, error } = e.detail || {};
+      showError(`Failed to store ${key}: ${error.message}`);
+      if (key === 'audios') {
+        setAudios(a => {
+          if (!a.length || a[a.length - 1].storageError) return a;
+          const copy = [...a];
+          copy[copy.length - 1] = { ...copy[copy.length - 1], storageError: true };
+          return copy;
+        });
+      }
+    };
+    window.addEventListener('storageError', handler);
+    return () => window.removeEventListener('storageError', handler);
+  }, []);
 
   useEffect(() => {
     if (ttsModels.length && !selectedTtsModels.length) {
@@ -275,7 +300,7 @@ export default function App() {
 
 
   const showError = msg => {
-    setErrorMsg(msg);
+    setErrors(errs => [...errs, msg]);
   };
 
   const addLog = (method, url, body = '', response = '', cost = '') => {
@@ -642,7 +667,12 @@ export default function App() {
     { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell },
     { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell },
     { field: 'provider', headerName: t('source'), width: 120, renderCell },
-    { field: 'audio', headerName: t('audio'), flex: 1, renderCell: p => p.row.url && <audio controls src={p.row.url}></audio> },
+    { field: 'audio', headerName: t('audio'), flex: 1, renderCell: p => (
+      <div>
+        {p.row.url && <audio controls src={p.row.url}></audio>}
+        {p.row.storageError && <div style={{color:'red'}}>{t('storageFailed')}</div>}
+      </div>
+    ) },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 160,
       renderCell: params => (
@@ -842,7 +872,14 @@ export default function App() {
         </div>
       )}
       </div>
-      <Snackbar open={!!errorMsg} message={errorMsg} onClose={() => setErrorMsg('')} autoHideDuration={6000} />
+      {errors.length > 0 && (
+        <div className="error-bar">
+          <span>{errors.join(' | ')}</span>
+          <IconButton size="small" onClick={() => setErrors([])} sx={{color:'inherit'}}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </div>
+      )}
     </>
   );
 }

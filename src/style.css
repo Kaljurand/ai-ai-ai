@@ -4,3 +4,17 @@ table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
 th, td { border: 1px solid #ccc; padding: 0.25rem; }
 .insert { background-color: #dfd; }
 .delete { background-color: #fdd; text-decoration: line-through; }
+.error-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #b71c1c;
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 1201;
+}
