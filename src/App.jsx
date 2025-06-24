@@ -723,7 +723,8 @@ export default function App() {
         }
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
-          const options = { file: blob, model };
+          const file = new File([blob], `audio.${ext}`);
+          const options = { file, model };
           if (asrPrompt) options.prompt = asrPrompt;
           const data = await openaiRef.current.audio.transcriptions.create(options);
           const body = { model, file: `<audio>.${ext}` };

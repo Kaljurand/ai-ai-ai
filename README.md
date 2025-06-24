@@ -41,7 +41,7 @@ npm test
 - Supports OpenAI `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` models via
   the `/v1/audio/transcriptions` endpoint using the official OpenAI JavaScript client.
 - Uses the original audio MIME type to set the file extension when
-  uploading to the transcription endpoint.
+  uploading to the transcription endpoint, sending the audio as a `File` object.
 - The Log tab now records complete request and response bodies,
   replacing long audio or text fields with `<audio>` or `<text>` for easier debugging.
 - View latest model pricing information in a dedicated tab.

@@ -25,6 +25,7 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('mimeMatch')).toBe(true);
     expect(code.includes('<audio>.${ext}')).toBe(true);
+    expect(code.includes('new File')).toBe(true);
   });
   it('formats log values', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
