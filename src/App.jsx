@@ -3,6 +3,8 @@ import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
 import {
   Button,
+  IconButton,
+  Tooltip,
   TextField,
   Select,
   MenuItem,
@@ -20,6 +22,9 @@ import {
   CircularProgress,
   Box,
 } from '@mui/material';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { DataGrid } from '@mui/x-data-grid';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -57,9 +62,29 @@ function makeMockTranscription(text) {
   return out.join(' ');
 }
 
+function PersistedGrid({ storageKey, ...props }) {
+  const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
+  const [filterModel, setFilterModel] = useStoredState(storageKey + 'Filter', { items: [] });
+  const [cols, setCols] = useStoredState(storageKey + 'Cols', {});
+  return (
+    <DataGrid
+      autoHeight
+      disableRowSelectionOnClick
+      sortingOrder={['asc', 'desc']}
+      sortModel={sortModel}
+      onSortModelChange={setSortModel}
+      filterModel={filterModel}
+      onFilterModelChange={setFilterModel}
+      columnVisibilityModel={cols}
+      onColumnVisibilityModelChange={setCols}
+      {...props}
+    />
+  );
+}
+
 const translations = {
   en: {
-    appTitle: 'Estonian Speech Comparison Tool',
+    appTitle: 'Speech Playground',
     tabText: 'Text',
     tabAudio: 'Audio',
     tabAsr: 'ASR',
@@ -74,8 +99,8 @@ const translations = {
     text: 'Text',
     source: 'Source',
     ttsPromptLabel: 'TTS prompt',
-    generatePrompt: 'Generate Prompt',
     generateAudio: 'Generate Audio',
+    metaPromptLabel: 'Meta prompt',
     uploadAudio: 'Upload Audio',
     recordAudio: 'Record Audio',
     stopRecording: 'Stop Recording',
@@ -100,7 +125,7 @@ const translations = {
     mockMode: 'Mock mode active: no API key'
   },
   et: {
-    appTitle: 'Eesti k\u00f5nev\u00f5rdluse t\u00f6\u00f6riist',
+    appTitle: 'K\u00f5ne m\u00e4nguplats',
     tabText: 'Tekst',
     tabAudio: 'Heli',
     tabAsr: 'ASR',
@@ -115,8 +140,8 @@ const translations = {
     text: 'Tekst',
     source: 'Allikas',
     ttsPromptLabel: 'TTS-prompt',
-    generatePrompt: 'Genereeri prompt',
     generateAudio: 'Genereeri heli',
+    metaPromptLabel: 'Metaprompt',
     uploadAudio: 'Laadi heli',
     recordAudio: 'Salvesta heli',
     stopRecording: 'Peata salvestus',
@@ -170,26 +195,14 @@ export default function App() {
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([]);
   const [selectedTtsModels, setSelectedTtsModels] = useStoredState('selectedTtsModels', []);
-  const [generateTtsPrompt, setGenerateTtsPrompt] = useState(false);
-  const [ttsGenPrompt, setTtsGenPrompt] = useState('Create a short Estonian greeting');
-  const [ttsGenModel, setTtsGenModel] = useStoredState('ttsGenModel', '');
+  const [ttsMetaPrompt, setTtsMetaPrompt] = useStoredState('ttsMetaPrompt', 'Convert the following text to audio speaking in double speed:');
   const [asrModels, setAsrModels] = useState([]);
   const [selectedAsrModels, setSelectedAsrModels] = useStoredState('selectedAsrModels', []);
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const [loadingCount, setLoadingCount] = useState(0);
-  const [audioSort, setAudioSort] = useState({ column: 'timestamp', asc: false });
-  const [resultSort, setResultSort] = useState({ column: 'i', asc: true });
   const [errorMsg, setErrorMsg] = useState('');
   const [logs, setLogs] = useStoredState('logs', []);
-  const [logSort, setLogSort] = useState({ column: 'time', asc: false });
-  const [visibleCols, setVisibleCols] = useStoredState('visibleResultCols', {
-    model: true,
-    original: true,
-    transcription: true,
-    wer: true,
-    diff: true,
-  });
 
   const predefinedPrompts = [
     'Write a 4-turn dialogue in Estonian between two speakers discussing the weather. The dialogue should include specific temperatures, wind speeds, dates, times, and common weather-related abbreviations (like °C, km/h, EMHI, jne.). The tone should be natural but information-dense.',
@@ -218,35 +231,10 @@ export default function App() {
     }
   }, [textModelsList]);
 
-  const ttsGenModelsList = [
-    ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
-    ...googleModels.map(m => ({ id: m, provider: 'google' }))
-  ];
 
-  const sortItems = (items, { column, asc }) => {
-    const withIndex = items.map((it, i) => ({ ...it, _index: i }));
-    const sorted = withIndex.sort((a, b) => {
-      const av = a[column];
-      const bv = b[column];
-      if (typeof av === 'number' && typeof bv === 'number') return av - bv;
-      if (Date.parse(av) && Date.parse(bv)) return new Date(av) - new Date(bv);
-      return String(av).localeCompare(String(bv));
-    });
-    const res = asc ? sorted : sorted.reverse();
-    return res;
-  };
 
-  const handleAudioSort = col => {
-    setAudioSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
-  };
 
-  const handleResultSort = col => {
-    setResultSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
-  };
 
-  const handleLogSort = col => {
-    setLogSort(s => ({ column: col, asc: s.column === col ? !s.asc : true }));
-  };
 
   const showError = msg => {
     setErrorMsg(msg);
@@ -318,15 +306,6 @@ export default function App() {
     })();
   }, [apiKeys.openai]);
 
-  useEffect(() => {
-    const all = [
-      ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
-      ...googleModels.map(m => ({ id: m, provider: 'google' }))
-    ];
-    if (!ttsGenModel && all.length) {
-      setTtsGenModel(all[0].id);
-    }
-  }, [openAiModels, googleModels]);
 
   useEffect(() => {
     const combined = [
@@ -454,55 +433,22 @@ export default function App() {
     }
   };
 
-  const generateTtsText = async () => {
-    setStatus('Generating prompt...');
-    if (mockMode) {
-      setTtsPrompt('Tere, see on genereeritud kõne.');
-      setStatus('');
-      return;
-    }
-    const prompt = ttsGenPrompt;
-    let text = '';
-    const modelInfo = ttsGenModelsList.find(m => m.id === ttsGenModel);
-    try {
-      if (modelInfo?.provider === 'google') {
-        const body = { prompt: { text: prompt } };
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${ttsGenModel}:generateText?key=${apiKeys.google}`;
-        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const data = await res.json().catch(() => ({}));
-        addLog('POST', url, body, data);
-        if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
-        text = data.candidates?.[0]?.output?.trim();
-      } else if (modelInfo?.provider === 'openai') {
-        const body = { model: ttsGenModel, messages: [{ role: 'user', content: prompt }] };
-        const url = 'https://api.openai.com/v1/chat/completions';
-        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
-        const data = await res.json().catch(() => ({}));
-        addLog('POST', url, body, data);
-        if (!res.ok) throw new Error(data.error?.message || 'Failed to generate prompt');
-        text = data.choices?.[0]?.message?.content?.trim();
-      }
-    } catch (e) {
-      showError(e.message);
-    }
-    if (text) setTtsPrompt(text);
-    setStatus('');
-  };
 
   const synthesizeTts = async () => {
     const idx = texts.length;
     const timestamp = new Date().toISOString();
-    setTexts([...texts, { provider: 'tts', text: ttsPrompt }]);
+    const fullPrompt = `${ttsMetaPrompt} ${ttsPrompt}`;
+    setTexts([...texts, { provider: 'tts', text: fullPrompt }]);
     for (const model of selectedTtsModels) {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
       if (mockMode) {
-        addLog('TTS', model, ttsPrompt, '<audio>', cost);
-        const blob = new Blob([ttsPrompt], { type: 'audio/plain' });
+        addLog('TTS', model, fullPrompt, '<audio>', cost);
+        const blob = new Blob([fullPrompt], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp }]);
       } else if (openAiModels.includes(model)) {
         const url = 'https://api.openai.com/v1/audio/speech';
-        const body = { model, input: ttsPrompt, voice: 'alloy', response_format: 'mp3' };
+        const body = { model, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
         const res = await fetchWithLoading(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
@@ -517,12 +463,12 @@ export default function App() {
         const blob = await res.blob();
         addLog('POST', url, body, '<audio>', cost);
         const data = await blobToDataUrl(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp }]);
       } else {
-        addLog('TTS', model, ttsPrompt, '<audio>', cost);
-        const blob = new Blob([`${model}:${ttsPrompt}`], { type: 'audio/plain' });
+        addLog('TTS', model, fullPrompt, '<audio>', cost);
+        const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
-        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: ttsPrompt, timestamp }]);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp }]);
       }
     }
   };
@@ -575,8 +521,34 @@ export default function App() {
     }));
   };
 
+  const deleteText = (index) => {
+    const newAudios = [];
+    const map = {};
+    audios.forEach((a, i) => {
+      if (a.index === index) return;
+      const updated = { ...a };
+      if (a.index > index) updated.index = a.index - 1;
+      map[i] = newAudios.length;
+      newAudios.push(updated);
+    });
+    const newTranscripts = transcripts.flatMap(tr => {
+      const origAudio = audios[tr.aIndex];
+      if (!origAudio || origAudio.index === index) return [];
+      return [{ ...tr, aIndex: map[tr.aIndex] }];
+    });
+    setAudios(newAudios);
+    setTranscripts(newTranscripts);
+    setTexts(t => t.filter((_, i) => i !== index));
+    if (selectedTextId === index) setSelectedTextId(null);
+    else if (selectedTextId > index) setSelectedTextId(selectedTextId - 1);
+  };
+
   const deleteTranscript = (tIndex) => {
     setTranscripts(t => t.filter((_, i) => i !== tIndex));
+  };
+
+  const deleteLog = (lIndex) => {
+    setLogs(l => l.filter((_, i) => i !== lIndex));
   };
 
   const updateText = (index, text) => {
@@ -633,9 +605,6 @@ export default function App() {
     return { i: i + 1, model: t.provider, original: txt.text, transcription: t.text, wer, diff };
   });
 
-  const sortedAudios = sortItems(audios, audioSort);
-  const sortedRows = sortItems(rows, resultSort);
-  const sortedLogs = sortItems(logs, logSort);
 
   return (
     <>
@@ -677,44 +646,43 @@ export default function App() {
               </ListItem>
             ))}
           </List>
-          <table>
-            <thead>
-              <tr>
-                <th>{t('textId')}</th>
-                <th>{t('timestamp')}</th>
-                <th>{t('text')}</th>
-                <th>{t('source')}</th>
-                <th>{t('actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {texts.map((txt, i) => (
-                <tr key={i}>
-                  <td>{i + 1}</td>
-                  <td>{txt.timestamp}</td>
-                  <td>{txt.text}</td>
-                  <td>{txt.provider}</td>
-                  <td><Button onClick={() => { setSelectedTextId(i); setTtsPrompt(txt.text); setView('audio'); }}>{t('useText')}</Button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <PersistedGrid
+            storageKey="texts"
+            rows={texts.map((txt, i) => ({ id: i, ...txt }))}
+            columns={[
+              { field: 'id', headerName: t('textId'), width: 70,
+                valueGetter: params => (params.row && params.row.id != null ? params.row.id + 1 : '') },
+              { field: 'timestamp', headerName: t('timestamp'), width: 180 },
+              { field: 'text', headerName: t('text'), flex: 1 },
+              { field: 'provider', headerName: t('source'), width: 120 },
+              {
+                field: 'actions',
+                headerName: t('actions'),
+                sortable: false,
+                filterable: false,
+                width: 150,
+                renderCell: params => (
+                  <>
+                    <Tooltip title={t('useText')}>
+                      <IconButton onClick={() => { setSelectedTextId(params.row.id); setTtsPrompt(params.row.text); setView('audio'); }} size="small">
+                        <ArrowForwardIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t('delete')}>
+                      <IconButton onClick={() => deleteText(params.row.id)} size="small" color="error">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )
+              }
+            ]}
+          />
         </div>
       )}
       {view === 'audio' && (
         <div style={{ padding: '1rem' }}>
-          <FormControlLabel control={<Checkbox checked={generateTtsPrompt} onChange={e => setGenerateTtsPrompt(e.target.checked)} />} label={t('generatePrompt')} />
-          {generateTtsPrompt && (
-            <>
-              <Select value={ttsGenModel} onChange={e => setTtsGenModel(e.target.value)} fullWidth>
-                {ttsGenModelsList.map(m => (
-                  <MenuItem key={m.id} value={m.id}>{`${m.id} (${m.provider})`}</MenuItem>
-                ))}
-              </Select>
-              <TextField label={t('promptForModels')} multiline rows={3} value={ttsGenPrompt} onChange={e => setTtsGenPrompt(e.target.value)} fullWidth margin="normal" />
-              <Button onClick={generateTtsText}>{t('generatePrompt')}</Button>
-            </>
-          )}
+          <TextField label={t('metaPromptLabel')} multiline rows={3} value={ttsMetaPrompt} onChange={e => setTtsMetaPrompt(e.target.value)} fullWidth margin="normal" />
           <TextField label={t('ttsPromptLabel')} multiline rows={3} value={ttsPrompt} onChange={e => setTtsPrompt(e.target.value)} fullWidth margin="normal" />
           <Select multiple value={selectedTtsModels} onChange={e => setSelectedTtsModels(e.target.value)} fullWidth renderValue={s => s.join(', ')}>
             {ttsModels.map(m => (
@@ -729,31 +697,47 @@ export default function App() {
           <Button onClick={recording ? stopRecording : startRecording} sx={{ mt: 1, ml: 1 }}>
             {recording ? t('stopRecording') : t('recordAudio')}
           </Button>
-          <table style={{ width: '100%', marginTop: '1rem' }}>
-            <thead>
-              <tr>
-                <th onClick={() => handleAudioSort('timestamp')}>{t('timestamp')}</th>
-                <th onClick={() => handleAudioSort('index')}>{t('textId')}</th>
-                <th onClick={() => handleAudioSort('provider')}>{t('source')}</th>
-                <th>{t('audio')}</th>
-                <th>{t('actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedAudios.map((a, i) => (
-                <tr key={i}>
-                  <td>{a.timestamp}</td>
-                  <td>{a.index + 1}</td>
-                  <td>{a.provider}</td>
-                  <td>{a.url && <audio controls src={a.url}></audio>}</td>
-                  <td>
-                    <Button onClick={() => transcribe(a._index)}>{t('toAsr')}</Button>
-                    <Button onClick={() => deleteAudio(a._index)} color="error" sx={{ ml: 1 }}>{t('delete')}</Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <PersistedGrid
+            storageKey="audios"
+            rows={audios.map((a, i) => ({ id: i, ...a, _index: i }))}
+            columns={[
+              { field: 'timestamp', headerName: t('timestamp'), width: 180 },
+              {
+                field: 'index',
+                headerName: t('textId'),
+                width: 80,
+                valueGetter: params => (params.row && params.row.index != null ? params.row.index + 1 : ''),
+              },
+              { field: 'provider', headerName: t('source'), width: 120 },
+              {
+                field: 'audio',
+                headerName: t('audio'),
+                flex: 1,
+                renderCell: params => params.row.url && <audio controls src={params.row.url}></audio>
+              },
+              {
+                field: 'actions',
+                headerName: t('actions'),
+                sortable: false,
+                filterable: false,
+                width: 160,
+                renderCell: params => (
+                  <>
+                    <Tooltip title={t('toAsr')}>
+                      <IconButton onClick={() => transcribe(params.row._index)} size="small">
+                        <ArrowForwardIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t('delete')}>
+                      <IconButton onClick={() => deleteAudio(params.row._index)} size="small" color="error">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )
+              }
+            ]}
+          />
           {status && <p>{status}</p>}
         </div>
       )}
@@ -770,80 +754,69 @@ export default function App() {
           <Button onClick={exportCSV}>{t('exportCSV')}</Button>
           <Button onClick={exportMD}>{t('exportMD')}</Button>
           <Button onClick={clearData}>{t('clearData')}</Button>
-          <div>
-            {Object.entries(visibleCols).map(([k, v]) => (
-              <FormControlLabel key={k}
-                control={<Checkbox checked={v} onChange={e => setVisibleCols({ ...visibleCols, [k]: e.target.checked })} />}
-                label={k.charAt(0).toUpperCase() + k.slice(1)}
-              />
-            ))}
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th onClick={() => handleResultSort('i')}>{t('transcriptId')}</th>
-                {visibleCols.model && (
-                  <th onClick={() => handleResultSort('model')}>{t('source')}</th>
-                )}
-                {visibleCols.original && (
-                  <th onClick={() => handleResultSort('original')}>{t('originalText')}</th>
-                )}
-                {visibleCols.transcription && (
-                  <th onClick={() => handleResultSort('transcription')}>{t('transcript')}</th>
-                )}
-                {visibleCols.wer && (
-                  <th onClick={() => handleResultSort('wer')}>{t('wer')}</th>
-                )}
-                {visibleCols.diff && (
-                  <th>{t('diff')}</th>
-                )}
-                <th>{t('actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((r, idx) => (
-                <tr key={idx}>
-                  <td>{r.i}</td>
-                  {visibleCols.model && <td>{r.model}</td>}
-                  {visibleCols.original && <td>{r.original}</td>}
-                  {visibleCols.transcription && <td>{r.transcription}</td>}
-                  {visibleCols.wer && <td>{r.wer}</td>}
-                  {visibleCols.diff && <td dangerouslySetInnerHTML={{__html:r.diff}}></td>}
-                  <td><Button onClick={() => deleteTranscript(idx)} color="error">{t('delete')}</Button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <PersistedGrid
+            storageKey="results"
+            rows={rows.map((r, idx) => ({ id: idx, ...r, _index: idx }))}
+            columns={[
+              { field: 'i', headerName: t('transcriptId'), width: 70 },
+              { field: 'model', headerName: t('source'), width: 140 },
+              { field: 'original', headerName: t('originalText'), flex: 1 },
+              { field: 'transcription', headerName: t('transcript'), flex: 1 },
+              { field: 'wer', headerName: t('wer'), width: 90 },
+              {
+                field: 'diff',
+                headerName: t('diff'),
+                flex: 1,
+                renderCell: params => <span dangerouslySetInnerHTML={{ __html: params.value }} />,
+              },
+              {
+                field: 'actions',
+                headerName: t('actions'),
+                sortable: false,
+                filterable: false,
+                width: 120,
+                renderCell: params => (
+                  <Tooltip title={t('delete')}>
+                    <IconButton onClick={() => deleteTranscript(params.row._index)} size="small" color="error">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ),
+              },
+            ]}
+          />
           {status && <p>{status}</p>}
         </div>
       )}
       {view === 'log' && (
         <div style={{ padding: '1rem' }}>
           <Typography variant="h6">{t('tabLog')}</Typography>
-          <table style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th onClick={() => handleLogSort('time')}>{t('timestamp')}</th>
-                <th onClick={() => handleLogSort('method')}>{t('actions')}</th>
-                <th onClick={() => handleLogSort('url')}>Endpoint</th>
-                <th>Body</th>
-                <th>Response</th>
-                <th onClick={() => handleLogSort('cost')}>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedLogs.map((l, i) => (
-                <tr key={i}>
-                  <td>{l.time}</td>
-                  <td>{l.method}</td>
-                  <td>{l.url}</td>
-                  <td>{l.body}</td>
-                  <td>{l.response}</td>
-                  <td>{l.cost}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <PersistedGrid
+            storageKey="logs"
+            rows={logs.map((l, i) => ({ id: i, ...l }))}
+            columns={[
+              { field: 'time', headerName: t('timestamp'), width: 180 },
+              { field: 'method', headerName: t('actions'), width: 100 },
+              { field: 'url', headerName: 'Endpoint', flex: 1 },
+              { field: 'body', headerName: 'Body', flex: 1 },
+              { field: 'response', headerName: 'Response', flex: 1 },
+              { field: 'cost', headerName: 'Cost', width: 100 },
+              {
+                field: 'actions',
+                headerName: t('actions'),
+                sortable: false,
+                filterable: false,
+                width: 120,
+                renderCell: params => (
+                  <Tooltip title={t('delete')}>
+                    <IconButton onClick={() => deleteLog(params.row.id)} size="small" color="error">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ),
+              }
+            ]}
+          />
         </div>
       )}
       {view === 'config' && (
