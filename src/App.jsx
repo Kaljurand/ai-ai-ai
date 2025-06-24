@@ -18,6 +18,7 @@ import {
   Tab,
   Checkbox,
   FormControlLabel,
+  Switch,
   CircularProgress,
   Box,
   Divider,
@@ -139,6 +140,7 @@ const translations = {
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
     demoPromptLabel: 'Demo prompts',
+    demoInstrLabel: 'Demo instructions',
     uploadPrompt: 'Upload Prompt',
     useText: 'Use for Audio',
     textId: 'ID',
@@ -177,6 +179,7 @@ const translations = {
     signIn: 'Sign in with Google',
     signOut: 'Sign out',
     language: 'Language',
+    darkMode: 'Dark mode',
     mockMode: 'Mock mode active: no API key',
     close: 'Close',
     storageFailed: 'Not stored',
@@ -194,6 +197,7 @@ const translations = {
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
+    demoInstrLabel: 'Demojuhised',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada helisse',
     textId: 'ID',
@@ -232,6 +236,7 @@ const translations = {
     signIn: 'Logi Google\u2019i',
     signOut: 'Logi v\u00e4lja',
     language: 'Keel',
+    darkMode: 'Tume re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     close: 'Sulge',
     storageFailed: 'Salvestus eba\u00f5nnestus',
@@ -249,6 +254,7 @@ const translations = {
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
+    demoInstrLabel: 'Demojuhised',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada h\u00e4\u00e4le',
     textId: 'ID',
@@ -287,6 +293,7 @@ const translations = {
     signIn: 'Logi Google\u2019i',
     signOut: 'Logi v\u00e4lja',
     language: 'Kiil',
+    darkMode: 'Tummas re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     close: 'Sulge',
     storageFailed: 'Salvestus epa\u00f5nnestus',
@@ -301,7 +308,7 @@ function useTranslation() {
   return { t, lang, setLang };
 }
 
-export default function App() {
+export default function App({ darkMode, setDarkMode }) {
   const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
   const [sheetUrl, setSheetUrl] = useStoredState('sheetUrl', '');
   const [googleClientId, setGoogleClientId] = useStoredState('googleClientId', '');
@@ -323,6 +330,7 @@ export default function App() {
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
   const [demoPrompt, setDemoPrompt] = useState('');
+  const [demoInstruction, setDemoInstruction] = useState('');
 
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([
@@ -346,6 +354,12 @@ export default function App() {
     'genereeri lustakas vestlus Riigikogu kohvikus, kus osalised r\u00e4\u00e4givad \u00fcksteisele vahele ja \u00fcksteisest \u00fcle (eralda need k\u00f5nekatked "..." m\u00e4rgiga).',
     'r\u00e4pi midagi Kaarel Kose stiilis',
     'loetle Eesti p\u00e4risnimesid, mis ainsuse nimetavas on kolmandas v\u00e4ltes, aga esita need mitmuse kaasa\u00fctlevas'
+  ];
+
+  const predefinedInstructions = [
+    'Expand all the abbreviations before you start speaking, e.g. "25 km/h-ni" should be expanded to "kahek\u00fcmneviie kilomeetrini tunnis" to make it easier to read.',
+    'Read the following text very fast as an energetic sports commentator, kind of like Gunnar Hololei.',
+    'Read the following text with a Finnish accent, e.g. screw up palatalization and "v\u00e4lted"'
   ];
 
   useEffect(() => {
@@ -983,6 +997,17 @@ export default function App() {
       )}
       {view === 'audio' && (
         <div style={{ padding: '1rem' }}>
+          <Select
+            value={demoInstruction}
+            onChange={e => { setDemoInstruction(e.target.value); setTtsMetaPrompt(e.target.value); }}
+            fullWidth
+            displayEmpty
+          >
+            <MenuItem value="" disabled>{t('demoInstrLabel')}</MenuItem>
+            {predefinedInstructions.map((p, i) => (
+              <MenuItem key={i} value={p}>{p}</MenuItem>
+            ))}
+          </Select>
           <TextField
             label={t('metaPromptLabel')}
             multiline
@@ -1109,6 +1134,11 @@ export default function App() {
           ) : (
             <Button size="small" onClick={signInGoogle} sx={{ mt: 1 }}>{t('signIn')}</Button>
           )}
+          <FormControlLabel
+            control={<Switch checked={darkMode} onChange={e => setDarkMode(e.target.checked)} />}
+            label={t('darkMode')}
+            sx={{ mt: 1 }}
+          />
           <Select value={lang} onChange={e => setLang(e.target.value)} fullWidth sx={{ mt: 1 }}>
             <MenuItem value="en">English</MenuItem>
             <MenuItem value="et">Eesti</MenuItem>

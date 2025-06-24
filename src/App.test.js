@@ -16,4 +16,9 @@ describe('App.jsx compilation', () => {
     expect(code.includes('gpt-4o-mini-tts')).toBe(true);
     expect(code.includes('tabPrices')).toBe(true);
   });
+  it('contains dark mode and demo instruction labels', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('darkMode')).toBe(true);
+    expect(code.includes('demoInstrLabel')).toBe(true);
+  });
 });
