@@ -39,7 +39,7 @@ npm test
 - Publishing requires signing in with Google using an OAuth client ID.
 - Results are persisted in browser local storage.
 - Supports OpenAI `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` models via
-  the `/v1/audio/transcriptions` endpoint.
+  the `/v1/audio/transcriptions` endpoint using the official OpenAI JavaScript client.
 - Uses the original audio MIME type to set the file extension when
   uploading to the transcription endpoint.
 - The Log tab now records complete request and response bodies,

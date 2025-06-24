@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PlaygroundIcon from './PlaygroundIcon';
 import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
@@ -28,6 +28,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
+import OpenAI from 'openai';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -314,6 +315,7 @@ export default function App() {
   const [status, setStatus] = useState('');
   const [provider, setProvider] = useStoredState('provider', 'openai');
   const [openAiModels, setOpenAiModels] = useState([]);
+  const openaiRef = useRef(null);
   const [googleModels, setGoogleModels] = useState([]);
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
@@ -519,6 +521,14 @@ export default function App() {
     })();
   }, [apiKeys.openai]);
 
+  useEffect(() => {
+    if (apiKeys.openai) {
+      openaiRef.current = new OpenAI({ apiKey: apiKeys.openai, dangerouslyAllowBrowser: true });
+    } else {
+      openaiRef.current = null;
+    }
+  }, [apiKeys.openai]);
+
 
   useEffect(() => {
     const combined = [
@@ -705,24 +715,20 @@ export default function App() {
         finish(text, 'mock');
         continue;
       }
-      if (openAiModels.includes(model)) {
-        const form = new FormData();
-        form.append('model', model);
+      if (openAiModels.includes(model) && openaiRef.current) {
         const mimeMatch = (audio.data || audio.url).match(/^data:([^;]+);/);
         let ext = 'webm';
         if (mimeMatch) {
           ext = mimeMatch[1].split('/')[1].split(';')[0];
         }
-        form.append('file', blob, `audio.${ext}`);
-        if (asrPrompt) form.append('prompt', asrPrompt);
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
-          const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
-          const data = await res.json().catch(() => ({}));
+          const options = { file: blob, model };
+          if (asrPrompt) options.prompt = asrPrompt;
+          const data = await openaiRef.current.audio.transcriptions.create(options);
           const body = { model, file: `<audio>.${ext}` };
           if (asrPrompt) body.prompt = asrPrompt;
           addLog('POST', url, body, data);
-          if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {

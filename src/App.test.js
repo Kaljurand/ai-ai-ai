@@ -24,11 +24,15 @@ describe('App.jsx compilation', () => {
   it('uses audio MIME type when uploading', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('mimeMatch')).toBe(true);
-    expect(code.includes('audio.${ext}')).toBe(true);
+    expect(code.includes('<audio>.${ext}')).toBe(true);
   });
   it('formats log values', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('formatLogValue')).toBe(true);
     expect(code.includes('<text>')).toBe(true);
+  });
+  it('uses OpenAI client for transcription', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('openaiRef.current.audio.transcriptions.create')).toBe(true);
   });
 });
