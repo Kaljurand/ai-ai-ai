@@ -17,9 +17,6 @@ import {
   Checkbox,
   FormControlLabel,
   Snackbar,
-  List,
-  ListItem,
-  ListItemText,
   CircularProgress,
   Box,
   Divider,
@@ -126,6 +123,7 @@ const translations = {
     tabSettings: 'Settings',
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
+    demoPromptLabel: 'Demo prompts',
     uploadPrompt: 'Upload Prompt',
     useText: 'Use for Audio',
     textId: 'ID',
@@ -167,6 +165,7 @@ const translations = {
     tabSettings: 'Seaded',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
+    demoPromptLabel: 'Demopromptid',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada helisse',
     textId: 'ID',
@@ -225,6 +224,7 @@ export default function App() {
   const [selectedTextId, setSelectedTextId] = useState(null);
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
+  const [demoPrompt, setDemoPrompt] = useState('');
 
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([]);
@@ -239,9 +239,13 @@ export default function App() {
   const [logs, setLogs] = useStoredState('logs', []);
 
   const predefinedPrompts = [
-    'Write a 4-turn dialogue in Estonian between two speakers discussing the weather. The dialogue should include specific temperatures, wind speeds, dates, times, and common weather-related abbreviations (like °C, km/h, EMHI, jne.). The tone should be natural but information-dense.',
-    'Generate a short news style weather update for Tallinn including temperatures and wind information.',
-    'Create a friendly conversation about weekend plans in Estonian.'
+    'write an Estonian haiku in the style of Jaan Pehk',
+    'write an Estonian sport report, something like "Eesti esireket Mark Lajal (ATP 167.) teenis Wimbledoni sl\u00e4mmiturniiri kvalifikatsiooni avaringis 3:6, 6:4, 6:3 v\u00f5idu Suurbritanniat esindava Jan Choinski (ATP 202.) \u00fcle."',
+    'make a list of all Estonian prime ministers in the order they took office. Just names separated by commas',
+    'tee nimekiri k\u00f5ikidest Elva linnapeadest, kelle ees- v\u00f5i perekonna nimi algab v\u00f5i l\u00f5peb "a" t\u00e4hega. Esita tulemused Markdown tabelina',
+    'genereeri lustakas vestlus Riigikogu kohvikus, kus osalised r\u00e4\u00e4givad \u00fcksteisele vahele ja \u00fcksteisest \u00fcle (eralda need k\u00f5nekatked "..." m\u00e4rgiga).',
+    'r\u00e4pi midagi Kaarel Kose stiilis',
+    'loetle Eesti p\u00e4risnimesid, mis ainsuse nimetavas on kolmandas v\u00e4ltes, aga esita need mitmuse kaasa\u00fctlevas'
   ];
 
   useEffect(() => {
@@ -730,16 +734,21 @@ export default function App() {
               <MenuItem key={m.id} value={m.id}>{`${m.id} (${m.provider})`}</MenuItem>
             ))}
           </Select>
+          <Select
+            value={demoPrompt}
+            onChange={e => { setDemoPrompt(e.target.value); setTextPrompt(e.target.value); }}
+            fullWidth
+            displayEmpty
+            sx={{ mt: 1 }}
+          >
+            <MenuItem value="" disabled>{t('demoPromptLabel')}</MenuItem>
+            {predefinedPrompts.map((p, i) => (
+              <MenuItem key={i} value={p}>{p}</MenuItem>
+            ))}
+          </Select>
           <TextField label={t('promptForModels')} multiline rows={3} value={textPrompt} onChange={e => setTextPrompt(e.target.value)} fullWidth margin="normal" />
           <Button onClick={generateTexts}>{t('genPrompt')}</Button>
           <Typography variant="h6" sx={{ mt: 2 }}>{t('tabText')}</Typography>
-          <List>
-            {predefinedPrompts.map((p, i) => (
-              <ListItem button key={i} onClick={() => setTextPrompt(p)}>
-                <ListItemText primary={p} />
-              </ListItem>
-            ))}
-          </List>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={textRows} columns={textColumns} name="texts" t={t} />
           <PersistedGrid
