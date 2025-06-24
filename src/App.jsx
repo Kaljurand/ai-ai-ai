@@ -136,7 +136,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Log',
     tabSettings: 'Settings',
-    tabPrices: 'Prices',
+    tabModels: 'Models',
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
     demoPromptLabel: 'Demo prompts',
@@ -185,7 +185,13 @@ const translations = {
     close: 'Close',
     storageFailed: 'Not stored',
     priceModel: 'Model',
-    pricePerM: 'USD per 1M tokens'
+    pricePerM: 'USD per 1M tokens',
+    tabModels: 'Models',
+    modelId: 'ID',
+    modelName: 'Name',
+    modelDesc: 'Description',
+    modality: 'Modality',
+    pricing: 'Pricing'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -194,7 +200,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Logi',
     tabSettings: 'Seaded',
-    tabPrices: 'Hinnad',
+    tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
@@ -243,7 +249,13 @@ const translations = {
     close: 'Sulge',
     storageFailed: 'Salvestus eba\u00f5nnestus',
     priceModel: 'Mudel',
-    pricePerM: 'USD 1M tokeni kohta'
+    pricePerM: 'USD 1M tokeni kohta',
+    tabModels: 'Mudelid',
+    modelId: 'ID',
+    modelName: 'Nimi',
+    modelDesc: 'Kirjeldus',
+    modality: 'Modaliteet',
+    pricing: 'Hind'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -252,7 +264,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Logi',
     tabSettings: 'S\u00f6tmis',
-    tabPrices: 'Hinnad',
+    tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
@@ -301,7 +313,13 @@ const translations = {
     close: 'Sulge',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
-    pricePerM: 'USD 1M tokeni p\u00e4\u00e4le'
+    pricePerM: 'USD 1M tokeni p\u00e4\u00e4le',
+    tabModels: 'Mudelid',
+    modelId: 'ID',
+    modelName: 'Nimi',
+    modelDesc: 'Kirjeldus',
+    modality: 'Modaliteet',
+    pricing: 'Hind'
   }
 };
 
@@ -396,7 +414,7 @@ export default function App({ darkMode, setDarkMode }) {
 
   const textModelsList = [
     ...openRouterModels
-      .filter(m => !/speech|audio|tts|whisper|transcribe|asr/i.test(m.id))
+      .filter(m => m.architecture?.modality === 'text->text')
       .map(m => ({ id: m.base, provider: 'openrouter' })),
     ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
     ...googleModels.map(m => ({ id: m, provider: 'google' }))
@@ -486,11 +504,11 @@ export default function App({ darkMode, setDarkMode }) {
         const data = await res.json().catch(() => ({}));
         addLog('GET', url, '', data);
         if (!res.ok) throw new Error(data.error?.message || data.detail || 'Failed to fetch OpenRouter models');
-        const models = (data.data || []).map(m => ({ id: m.id, base: m.id.split('/').pop(), pricing: m.pricing?.prompt }));
+        const models = (data.data || []).map(m => ({ ...m, base: m.id.split('/').pop() }));
         if (models.length) {
           setOpenRouterModels(models);
           const map = {};
-          models.forEach(m => { map[m.base] = { id: m.id, pricing: m.pricing?.prompt }; });
+          models.forEach(m => { map[m.base] = m; });
           setOpenRouterMap(map);
           const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({ id: m.base, name: m.id, cost: m.pricing?.prompt || '', provider: 'openrouter' }));
           if (tts.length) {
@@ -1007,22 +1025,24 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const priceRows = React.useMemo(() => {
-    const base = [
-      { id: 0, provider: 'google', model: 'gemini-1.5-flash', price: 0.35 },
-      { id: 1, provider: 'openai', model: 'gpt-3.5-turbo-0125', price: 0.5 },
-      { id: 2, provider: 'openai', model: 'gpt-4o-mini', price: 1 },
-      { id: 3, provider: 'google', model: 'gemini-1.5-pro', price: 3 },
-      { id: 4, provider: 'openai', model: 'gpt-4o', price: 5 }
-    ];
-    const start = base.length;
-    const orRows = openRouterModels.map((m, i) => ({ id: start + i, provider: 'openrouter', model: m.base, price: Number(m.pricing || 0) }));
-    return [...base, ...orRows];
-  }, [openRouterModels]);
-  const priceColumns = [
-    { field: 'provider', headerName: t('source'), width: 120, renderCell },
-    { field: 'model', headerName: t('priceModel'), flex: 1, renderCell },
-    { field: 'price', headerName: t('pricePerM'), width: 150, renderCell: p => `$${p.value.toFixed(2)}` }
+  const modelRows = React.useMemo(
+    () =>
+      openRouterModels.map((m, i) => ({
+        id: i,
+        modelId: m.id,
+        name: m.name,
+        description: m.description,
+        modality: m.architecture?.modality || '',
+        pricing: JSON.stringify(m.pricing || {})
+      })),
+    [openRouterModels]
+  );
+  const modelColumns = [
+    { field: 'modelId', headerName: t('modelId'), width: 200, renderCell },
+    { field: 'name', headerName: t('modelName'), width: 200, renderCell },
+    { field: 'description', headerName: t('modelDesc'), flex: 1, renderCell },
+    { field: 'modality', headerName: t('modality'), width: 120, renderCell },
+    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell }
   ];
 
 
@@ -1037,7 +1057,7 @@ export default function App({ darkMode, setDarkMode }) {
             <Tab value="audio" label={t('tabAudio')} />
             <Tab value="asr" label={t('tabAsr')} />
             <Tab value="log" label={t('tabLog')} />
-            <Tab value="prices" label={t('tabPrices')} />
+            <Tab value="models" label={t('tabModels')} />
             <Tab value="config" label={t('tabSettings')} />
           </Tabs>
           {loadingCount > 0 && (
@@ -1169,13 +1189,13 @@ export default function App({ darkMode, setDarkMode }) {
           {status && <p>{status}</p>}
         </div>
       )}
-      {view === 'prices' && (
+      {view === 'models' && (
         <div style={{ padding: '1rem' }}>
-          <ExportButtons rows={priceRows} columns={priceColumns} name="prices" t={t} />
+          <ExportButtons rows={modelRows} columns={modelColumns} name="models" t={t} />
           <PersistedGrid
-            storageKey="prices"
-            rows={priceRows}
-            columns={priceColumns}
+            storageKey="models"
+            rows={modelRows}
+            columns={modelColumns}
           />
         </div>
       )}
