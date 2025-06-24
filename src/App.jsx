@@ -135,6 +135,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Log',
     tabSettings: 'Settings',
+    tabPrices: 'Prices',
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
     demoPromptLabel: 'Demo prompts',
@@ -178,7 +179,9 @@ const translations = {
     language: 'Language',
     mockMode: 'Mock mode active: no API key',
     close: 'Close',
-    storageFailed: 'Not stored'
+    storageFailed: 'Not stored',
+    priceModel: 'Model',
+    pricePerM: 'USD per 1M tokens'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -187,6 +190,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Logi',
     tabSettings: 'Seaded',
+    tabPrices: 'Hinnad',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
@@ -230,7 +234,9 @@ const translations = {
     language: 'Keel',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     close: 'Sulge',
-    storageFailed: 'Salvestus eba\u00f5nnestus'
+    storageFailed: 'Salvestus eba\u00f5nnestus',
+    priceModel: 'Mudel',
+    pricePerM: 'USD 1M tokeni kohta'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -239,6 +245,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Logi',
     tabSettings: 'S\u00f6tmis',
+    tabPrices: 'Hinnad',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
@@ -282,7 +289,9 @@ const translations = {
     language: 'Kiil',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     close: 'Sulge',
-    storageFailed: 'Salvestus epa\u00f5nnestus'
+    storageFailed: 'Salvestus epa\u00f5nnestus',
+    priceModel: 'Mudel',
+    pricePerM: 'USD 1M tokeni p\u00e4\u00e4le'
   }
 };
 
@@ -316,7 +325,9 @@ export default function App() {
   const [demoPrompt, setDemoPrompt] = useState('');
 
   const [view, setView] = useState('audio');
-  const [ttsModels, setTtsModels] = useState([]);
+  const [ttsModels, setTtsModels] = useState([
+    { id: 'gpt-4o-mini-tts', name: 'gpt-4o-mini-tts', cost: '', provider: 'openai' }
+  ]);
   const [selectedTtsModels, setSelectedTtsModels] = useStoredState('selectedTtsModels', []);
   const [ttsMetaPrompt, setTtsMetaPrompt] = useStoredState('ttsMetaPrompt', 'Convert the following text to audio speaking in double speed:');
   const [asrModels, setAsrModels] = useState([]);
@@ -459,8 +470,11 @@ export default function App() {
           setOpenAiModels(models);
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
-        const tts = data.data?.filter(m => m.id.startsWith('tts-') || /audio|speech|multimodal/i.test(m.id)).map(m => ({ id: m.id, name: m.id, cost: '', provider: 'openai' }));
-        if (tts?.length) {
+        const tts = data.data?.filter(m => m.id.startsWith('tts-') || /audio|speech|multimodal/i.test(m.id)).map(m => ({ id: m.id, name: m.id, cost: '', provider: 'openai' })) || [];
+        if (!tts.some(m => m.id === 'gpt-4o-mini-tts')) {
+          tts.push({ id: 'gpt-4o-mini-tts', name: 'gpt-4o-mini-tts', cost: '', provider: 'openai' });
+        }
+        if (tts.length) {
           setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !tts.some(v => v.id === x.id)), ...tts]);
           if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
         }
@@ -891,6 +905,19 @@ export default function App() {
     }
   ];
 
+  const priceRows = [
+    { id: 0, provider: 'google', model: 'gemini-1.5-flash', price: 0.35 },
+    { id: 1, provider: 'openai', model: 'gpt-3.5-turbo-0125', price: 0.5 },
+    { id: 2, provider: 'openai', model: 'gpt-4o-mini', price: 1 },
+    { id: 3, provider: 'google', model: 'gemini-1.5-pro', price: 3 },
+    { id: 4, provider: 'openai', model: 'gpt-4o', price: 5 }
+  ];
+  const priceColumns = [
+    { field: 'provider', headerName: t('source'), width: 120, renderCell },
+    { field: 'model', headerName: t('priceModel'), flex: 1, renderCell },
+    { field: 'price', headerName: t('pricePerM'), width: 150, renderCell: p => `$${p.value.toFixed(2)}` }
+  ];
+
 
   return (
     <>
@@ -903,6 +930,7 @@ export default function App() {
             <Tab value="audio" label={t('tabAudio')} />
             <Tab value="asr" label={t('tabAsr')} />
             <Tab value="log" label={t('tabLog')} />
+            <Tab value="prices" label={t('tabPrices')} />
             <Tab value="config" label={t('tabSettings')} />
           </Tabs>
           {loadingCount > 0 && (
@@ -1021,6 +1049,16 @@ export default function App() {
             columns={resultColumns}
           />
           {status && <p>{status}</p>}
+        </div>
+      )}
+      {view === 'prices' && (
+        <div style={{ padding: '1rem' }}>
+          <ExportButtons rows={priceRows} columns={priceColumns} name="prices" t={t} />
+          <PersistedGrid
+            storageKey="prices"
+            rows={priceRows}
+            columns={priceColumns}
+          />
         </div>
       )}
       {view === 'log' && (
