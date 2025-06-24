@@ -3,6 +3,8 @@ import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
 import {
   Button,
+  IconButton,
+  Tooltip,
   TextField,
   Select,
   MenuItem,
@@ -20,6 +22,8 @@ import {
   CircularProgress,
   Box,
 } from '@mui/material';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { DataGrid } from '@mui/x-data-grid';
 
 function useStoredState(key, initial) {
@@ -659,8 +663,16 @@ export default function App() {
                 width: 150,
                 renderCell: params => (
                   <>
-                    <Button onClick={() => { setSelectedTextId(params.row.id); setTtsPrompt(params.row.text); setView('audio'); }}>{t('useText')}</Button>
-                    <Button onClick={() => deleteText(params.row.id)} color="error" sx={{ ml: 1 }}>{t('delete')}</Button>
+                    <Tooltip title={t('useText')}>
+                      <IconButton onClick={() => { setSelectedTextId(params.row.id); setTtsPrompt(params.row.text); setView('audio'); }} size="small">
+                        <ArrowForwardIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t('delete')}>
+                      <IconButton onClick={() => deleteText(params.row.id)} size="small" color="error">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </>
                 )
               }
@@ -711,8 +723,16 @@ export default function App() {
                 width: 160,
                 renderCell: params => (
                   <>
-                    <Button onClick={() => transcribe(params.row._index)}>{t('toAsr')}</Button>
-                    <Button onClick={() => deleteAudio(params.row._index)} color="error" sx={{ ml: 1 }}>{t('delete')}</Button>
+                    <Tooltip title={t('toAsr')}>
+                      <IconButton onClick={() => transcribe(params.row._index)} size="small">
+                        <ArrowForwardIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t('delete')}>
+                      <IconButton onClick={() => deleteAudio(params.row._index)} size="small" color="error">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </>
                 )
               }
@@ -756,7 +776,11 @@ export default function App() {
                 filterable: false,
                 width: 120,
                 renderCell: params => (
-                  <Button onClick={() => deleteTranscript(params.row._index)} color="error">{t('delete')}</Button>
+                  <Tooltip title={t('delete')}>
+                    <IconButton onClick={() => deleteTranscript(params.row._index)} size="small" color="error">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 ),
               },
             ]}
@@ -784,7 +808,11 @@ export default function App() {
                 filterable: false,
                 width: 120,
                 renderCell: params => (
-                  <Button onClick={() => deleteLog(params.row.id)} color="error">{t('delete')}</Button>
+                  <Tooltip title={t('delete')}>
+                    <IconButton onClick={() => deleteLog(params.row.id)} size="small" color="error">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 ),
               }
             ]}
