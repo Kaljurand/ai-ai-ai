@@ -3,6 +3,7 @@ import PlaygroundIcon from './PlaygroundIcon';
 import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
 import { transcriptsToRows } from './resultUtils';
+import { parseSheetId } from './googleSheet';
 import {
   Button,
   IconButton,
@@ -161,6 +162,9 @@ const translations = {
     googleKey: 'Google API key',
     sheetUrl: 'Google Sheet URL',
     publish: 'Publish',
+    googleClientId: 'Google Client ID',
+    signIn: 'Sign in with Google',
+    signOut: 'Sign out',
     language: 'Language',
     mockMode: 'Mock mode active: no API key',
     close: 'Close',
@@ -207,6 +211,9 @@ const translations = {
     googleKey: 'Google API v\u00f5ti',
     sheetUrl: 'Google Sheeti URL',
     publish: 'Avalda',
+    googleClientId: 'Google kliendi ID',
+    signIn: 'Logi Google\u2019i',
+    signOut: 'Logi v\u00e4lja',
     language: 'Keel',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     close: 'Sulge',
@@ -223,6 +230,8 @@ function useTranslation() {
 export default function App() {
   const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
   const [sheetUrl, setSheetUrl] = useStoredState('sheetUrl', '');
+  const [googleClientId, setGoogleClientId] = useStoredState('googleClientId', '');
+  const [googleToken, setGoogleToken] = useStoredState('googleToken', '');
   const { t, lang, setLang } = useTranslation();
   const [texts, setTexts] = useStoredState('texts', []);
   const [audios, setAudios] = useStoredState('audios', []);
@@ -345,6 +354,25 @@ export default function App() {
   };
 
   const mockMode = !apiKeys.openai && !apiKeys.google;
+
+  const signInGoogle = () => {
+    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      showError('Google API not available');
+      return;
+    }
+    if (!googleClientId) {
+      showError('Missing Google Client ID');
+      return;
+    }
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: googleClientId,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      callback: token => setGoogleToken(token.access_token)
+    });
+    client.requestAccessToken({ prompt: '' });
+  };
+
+  const signOutGoogle = () => setGoogleToken('');
 
   useEffect(() => {
     if (!apiKeys.openai) return;
@@ -620,16 +648,15 @@ export default function App() {
   const publishTranscript = async (tIndex) => {
     const tr = transcripts[tIndex];
     if (!tr) return;
-    if (!sheetUrl || !apiKeys.google) {
-      showError('Missing Google Sheet URL or API key');
+    if (!sheetUrl || (!apiKeys.google && !googleToken)) {
+      showError('Missing Google Sheet URL or auth');
       return;
     }
-    const idMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!idMatch) {
+    const sheetId = parseSheetId(sheetUrl);
+    if (!sheetId) {
       showError('Invalid Google Sheet URL');
       return;
     }
-    const sheetId = idMatch[1];
     const audio = audios[tr.aIndex];
     const txt = audio ? texts[audio.index] : null;
     const row = [
@@ -641,10 +668,13 @@ export default function App() {
       tr.text,
       txt ? wordErrorRate(txt.text, tr.text) : 1
     ];
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append?valueInputOption=USER_ENTERED&key=${apiKeys.google}`;
+    const keyParam = apiKeys.google ? `?valueInputOption=USER_ENTERED&key=${apiKeys.google}` : '?valueInputOption=USER_ENTERED';
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append${keyParam}`;
     const body = { values: [row] };
     try {
-      const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const headers = { 'Content-Type': 'application/json' };
+      if (googleToken && !apiKeys.google) headers['Authorization'] = `Bearer ${googleToken}`;
+      const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       addLog('POST', url, row, data);
       if (!res.ok) throw new Error(data.error?.message || 'Publish failed');
@@ -915,6 +945,18 @@ export default function App() {
             fullWidth
             margin="normal"
           />
+          <TextField
+            label={t('googleClientId')}
+            value={googleClientId}
+            onChange={e => setGoogleClientId(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          {googleToken ? (
+            <Button onClick={signOutGoogle} sx={{ mt: 1 }}>{t('signOut')}</Button>
+          ) : (
+            <Button onClick={signInGoogle} sx={{ mt: 1 }}>{t('signIn')}</Button>
+          )}
           <Select value={lang} onChange={e => setLang(e.target.value)} fullWidth sx={{ mt: 1 }}>
             <MenuItem value="en">English</MenuItem>
             <MenuItem value="et">Eesti</MenuItem>

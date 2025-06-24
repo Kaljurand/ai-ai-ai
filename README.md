@@ -36,6 +36,7 @@ npm test
 - Users can add their own texts, edit generated ones and upload audio files.
 - Export results as JSON or CSV and clear all stored data.
 - Publish individual ASR result rows to a configurable Google Sheet.
+- Publishing requires signing in with Google using an OAuth client ID.
 - Results are persisted in browser local storage.
 
 This is not a production-ready system but demonstrates the flow described in the specification.
