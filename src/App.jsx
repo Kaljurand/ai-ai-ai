@@ -730,7 +730,7 @@ export default function App() {
           <Button onClick={clearData}>{t('clearData')}</Button>
           <PersistedGrid
             storageKey="results"
-            rows={sortedRows.map((r, idx) => ({ id: idx, ...r, _index: idx }))}
+            rows={rows.map((r, idx) => ({ id: idx, ...r, _index: idx }))}
             columns={[
               { field: 'i', headerName: t('transcriptId'), width: 70 },
               { field: 'model', headerName: t('source'), width: 140 },
