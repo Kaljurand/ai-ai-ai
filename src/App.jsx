@@ -465,8 +465,10 @@ export default function App() {
         const data = await res.json().catch(() => ({}));
         addLog('GET', url, '', data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch OpenAI models');
-        const models = data.data?.map(m => m.id).sort();
-        if (models?.length) {
+        const models = data.data?.map(m => m.id).sort() || [];
+        if (!models.includes('gpt-4o-transcribe')) models.push('gpt-4o-transcribe');
+        if (!models.includes('gpt-4o-mini-transcribe')) models.push('gpt-4o-mini-transcribe');
+        if (models.length) {
           setOpenAiModels(models);
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
