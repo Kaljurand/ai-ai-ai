@@ -803,7 +803,13 @@ export default function App() {
     { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell },
     { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell },
     { field: 'provider', headerName: t('source'), width: 120, renderCell },
-    { field: 'text', headerName: t('text'), flex: 1, valueGetter: p => texts[p.row.index]?.text || '', renderCell },
+    {
+      field: 'text',
+      headerName: t('text'),
+      flex: 1,
+      valueGetter: p => (p && p.row && p.row.index != null ? (texts[p.row.index]?.text || '') : ''),
+      renderCell
+    },
     { field: 'audio', headerName: t('audio'), flex: 1, sortComparator: (a,b,c,d) => (c?.row?.duration ?? 0) - (d?.row?.duration ?? 0), renderCell: p => (
       <div>
         {p.row.url && <audio controls src={p.row.url}></audio>}
