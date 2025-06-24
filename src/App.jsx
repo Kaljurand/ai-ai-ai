@@ -646,7 +646,8 @@ export default function App() {
             storageKey="texts"
             rows={texts.map((txt, i) => ({ id: i, ...txt }))}
             columns={[
-              { field: 'id', headerName: t('textId'), width: 70, valueGetter: params => params.row.id + 1 },
+              { field: 'id', headerName: t('textId'), width: 70,
+                valueGetter: params => (params.row && params.row.id != null ? params.row.id + 1 : '') },
               { field: 'timestamp', headerName: t('timestamp'), width: 180 },
               { field: 'text', headerName: t('text'), flex: 1 },
               { field: 'provider', headerName: t('source'), width: 120 },
