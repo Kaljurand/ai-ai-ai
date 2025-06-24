@@ -35,6 +35,7 @@ npm test
 - Visual diff view highlighting transcription errors.
 - Users can add their own texts, edit generated ones and upload audio files.
 - Export results as JSON or CSV and clear all stored data.
+- Publish individual ASR result rows to a configurable Google Sheet.
 - Results are persisted in browser local storage.
 
 This is not a production-ready system but demonstrates the flow described in the specification.

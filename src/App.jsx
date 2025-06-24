@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
@@ -157,6 +158,8 @@ const translations = {
     clearData: 'Clear Data',
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
+    sheetUrl: 'Google Sheet URL',
+    publish: 'Publish',
     language: 'Language',
     mockMode: 'Mock mode active: no API key',
     close: 'Close',
@@ -201,6 +204,8 @@ const translations = {
     clearData: 'Puhasta andmed',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
+    sheetUrl: 'Google Sheeti URL',
+    publish: 'Avalda',
     language: 'Keel',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     close: 'Sulge',
@@ -216,6 +221,7 @@ function useTranslation() {
 
 export default function App() {
   const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
+  const [sheetUrl, setSheetUrl] = useStoredState('sheetUrl', '');
   const { t, lang, setLang } = useTranslation();
   const [texts, setTexts] = useStoredState('texts', []);
   const [audios, setAudios] = useStoredState('audios', []);
@@ -543,7 +549,7 @@ export default function App() {
     const blob = dataUrlToBlob(audio.data || audio.url);
     for (const model of selectedAsrModels) {
       const finish = (text, provider) => {
-        setTranscripts(t => [...t, { aIndex, provider, text, prompt: asrPrompt }]);
+        setTranscripts(t => [...t, { aIndex, provider, text, prompt: asrPrompt, timestamp: new Date().toISOString() }]);
       };
       if (mockMode) {
         const text = makeMockTranscription(texts[audio.index]?.text || '');
@@ -608,6 +614,42 @@ export default function App() {
 
   const deleteTranscript = (tIndex) => {
     setTranscripts(t => t.filter((_, i) => i !== tIndex));
+  };
+
+  const publishTranscript = async (tIndex) => {
+    const tr = transcripts[tIndex];
+    if (!tr) return;
+    if (!sheetUrl || !apiKeys.google) {
+      showError('Missing Google Sheet URL or API key');
+      return;
+    }
+    const idMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!idMatch) {
+      showError('Invalid Google Sheet URL');
+      return;
+    }
+    const sheetId = idMatch[1];
+    const audio = audios[tr.aIndex];
+    const txt = texts[audio.index];
+    const row = [
+      tr.timestamp || audio.timestamp || new Date().toISOString(),
+      tr.provider,
+      audio.provider,
+      txt.provider,
+      txt.text,
+      tr.text,
+      wordErrorRate(txt.text, tr.text)
+    ];
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append?valueInputOption=USER_ENTERED&key=${apiKeys.google}`;
+    const body = { values: [row] };
+    try {
+      const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      addLog('POST', url, row, data);
+      if (!res.ok) throw new Error(data.error?.message || 'Publish failed');
+    } catch (e) {
+      showError(e.message);
+    }
   };
 
   const deleteLog = (lIndex) => {
@@ -701,13 +743,20 @@ export default function App() {
     { field: 'wer', headerName: t('wer'), width: 90, renderCell },
     { field: 'diff', headerName: t('diff'), flex: 1, renderCell: renderHtmlCell },
     {
-      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 120,
+      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 150,
       renderCell: params => (
-        <Tooltip title={t('delete')}>
-          <IconButton onClick={() => deleteTranscript(params.row._index)} size="small" color="error">
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <>
+          <Tooltip title={t('publish')}>
+            <IconButton onClick={() => publishTranscript(params.row._index)} size="small">
+              <CloudUploadIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={t('delete')}>
+            <IconButton onClick={() => deleteTranscript(params.row._index)} size="small" color="error">
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </>
       )
     }
   ];
@@ -861,6 +910,13 @@ export default function App() {
             type="password"
             value={apiKeys.google}
             onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label={t('sheetUrl')}
+            value={sheetUrl}
+            onChange={e => setSheetUrl(e.target.value)}
             fullWidth
             margin="normal"
           />
