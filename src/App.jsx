@@ -23,7 +23,6 @@ import {
   Box,
   Divider,
   Dialog,
-  DialogTitle,
   DialogContent,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -74,16 +73,47 @@ function makeMockTranscription(text) {
   return out.join(' ');
 }
 
+function highlightJson(str) {
+  try {
+    str = JSON.stringify(JSON.parse(str), null, 2);
+  } catch (e) {
+    return null;
+  }
+  const esc = str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return esc.replace(/(\"(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*\"(?=:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)/g, match => {
+    let cls = 'number';
+    if (/^"/.test(match)) {
+      cls = /:$/.test(match) ? 'key' : 'string';
+    } else if (/true|false/.test(match)) {
+      cls = 'boolean';
+    } else if (/null/.test(match)) {
+      cls = 'null';
+    }
+    return `<span class="json-${cls}">${match}</span>`;
+  });
+}
+
 function PersistedGrid({ storageKey, t, ...props }) {
   const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
   const [filterModel, setFilterModel] = useStoredState(storageKey + 'Filter', { items: [] });
   const [cols, setCols] = useStoredState(storageKey + 'Cols', {});
   const [preview, setPreview] = useState('');
+  const [previewType, setPreviewType] = useState('markdown');
   const [open, setOpen] = useState(false);
-  const html = React.useMemo(() => marked.parse(preview || ''), [preview]);
+  const html = React.useMemo(() => {
+    if (previewType === 'json') {
+      const h = highlightJson(preview);
+      if (h) return `<pre>${h}</pre>`;
+    }
+    return marked.parse(preview || '');
+  }, [preview, previewType]);
   const handleCellClick = params => {
     if (typeof params.value === 'string' && params.value) {
       setPreview(params.value);
+      setPreviewType(highlightJson(params.value) ? 'json' : 'markdown');
       setOpen(true);
     }
   };
@@ -105,7 +135,6 @@ function PersistedGrid({ storageKey, t, ...props }) {
         {...props}
       />
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{t('preview')}</DialogTitle>
         <DialogContent dividers>
           <div dangerouslySetInnerHTML={{ __html: html }} />
         </DialogContent>
@@ -123,9 +152,15 @@ function renderCell(params) {
   if (['timestamp', 'time', 'provider', 'textSource', 'audioSource', 'asrSource', 'wer'].includes(params.field)) {
     style.fontFamily = 'monospace';
   }
+  const json = highlightJson(val);
+  const content = json ? (
+    <span style={style} dangerouslySetInnerHTML={{ __html: json }} />
+  ) : (
+    <span style={style}>{val}</span>
+  );
   return (
     <Tooltip title={val} placement="top">
-      <span style={style}>{val}</span>
+      {content}
     </Tooltip>
   );
 }
@@ -161,8 +196,11 @@ const translations = {
     tabModels: 'Models',
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
-    demoPromptLabel: 'Demo prompts',
-    demoInstrLabel: 'Demo instructions',
+    examplePromptLabel: 'Example prompts',
+    exampleInstrLabel: 'Example instructions',
+    groupKeys: 'Keys',
+    groupGoogle: 'Google',
+    groupUi: 'UI',
     uploadPrompt: 'Upload Prompt',
     useText: 'Use for Audio',
     textId: 'ID',
@@ -225,8 +263,11 @@ const translations = {
     tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
-    demoPromptLabel: 'Demopromptid',
-    demoInstrLabel: 'Demojuhised',
+    examplePromptLabel: 'N\u00e4idispromptid',
+    exampleInstrLabel: 'N\u00e4idisjuhised',
+    groupKeys: 'V\u00f5tmed',
+    groupGoogle: 'Google',
+    groupUi: 'Kasutajaliides',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada helisse',
     textId: 'ID',
@@ -289,8 +330,11 @@ const translations = {
     tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
-    demoPromptLabel: 'Demopromptid',
-    demoInstrLabel: 'Demojuhised',
+    examplePromptLabel: 'N\u00e4idispromptid',
+    exampleInstrLabel: 'N\u00e4idisjuhised',
+    groupKeys: 'V\u00f5tmed',
+    groupGoogle: 'Google',
+    groupUi: 'Kasutajaliides',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada h\u00e4\u00e4le',
     textId: 'ID',
@@ -1119,7 +1163,7 @@ export default function App({ darkMode, setDarkMode }) {
             displayEmpty
             sx={{ mt: 1 }}
           >
-            <MenuItem value="" disabled>{t('demoPromptLabel')}</MenuItem>
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
             {predefinedPrompts.map((p, i) => (
               <MenuItem key={i} value={p}>{p}</MenuItem>
             ))}
@@ -1144,7 +1188,7 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             displayEmpty
           >
-            <MenuItem value="" disabled>{t('demoInstrLabel')}</MenuItem>
+            <MenuItem value="" disabled>{t('exampleInstrLabel')}</MenuItem>
             {predefinedInstructions.map((p, i) => (
               <MenuItem key={i} value={p}>{p}</MenuItem>
             ))}
@@ -1205,6 +1249,18 @@ export default function App({ darkMode, setDarkMode }) {
               <MenuItem key={m.id} value={m.id} sx={{ fontFamily: 'monospace' }}>{`${m.provider} ${m.name}`}</MenuItem>
             ))}
           </Select>
+          <Select
+            value={demoPrompt}
+            onChange={e => { setDemoPrompt(e.target.value); setAsrPrompt(e.target.value); }}
+            fullWidth
+            displayEmpty
+            sx={{ mt: 1 }}
+          >
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
+            {predefinedPrompts.map((p, i) => (
+              <MenuItem key={i} value={p}>{p}</MenuItem>
+            ))}
+          </Select>
           <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t}>
@@ -1244,6 +1300,7 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'config' && (
         <div style={{ padding: '1rem' }}>
+          <Typography variant="subtitle1" sx={{ mt: 1 }}>{t('groupKeys')}</Typography>
           <TextField
             label={t('openaiKey')}
             type="password"
@@ -1275,6 +1332,8 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             margin="normal"
           />
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" sx={{ mt: 1 }}>{t('groupGoogle')}</Typography>
           <TextField
             label={t('googleClientId')}
             value={googleClientId}
@@ -1287,6 +1346,8 @@ export default function App({ darkMode, setDarkMode }) {
           ) : (
             <Button size="small" onClick={signInGoogle} sx={{ mt: 1 }}>{t('signIn')}</Button>
           )}
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" sx={{ mt: 1 }}>{t('groupUi')}</Typography>
           <FormControlLabel
             control={<Switch checked={darkMode} onChange={e => setDarkMode(e.target.checked)} />}
             label={t('darkMode')}
