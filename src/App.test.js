@@ -11,14 +11,18 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('vro:')).toBe(true);
   });
-  it('includes new TTS model and prices tab', () => {
+  it('includes new TTS model and models tab', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('gpt-4o-mini-tts')).toBe(true);
-    expect(code.includes('tabPrices')).toBe(true);
+    expect(code.includes('tabModels')).toBe(true);
   });
   it('contains dark mode and demo instruction labels', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('darkMode')).toBe(true);
     expect(code.includes('demoInstrLabel')).toBe(true);
+  });
+  it('contains OpenRouter API key label', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('openrouterKey')).toBe(true);
   });
 });

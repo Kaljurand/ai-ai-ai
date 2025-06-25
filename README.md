@@ -27,8 +27,8 @@ npm test
 
 ## Features
 
-- Generate Estonian texts via OpenAI or Google APIs. A built‑in mock mode is used when no API keys are provided.
-- API keys and available models for each provider can be entered in the UI. Model lists are fetched from the APIs.
+- Generate Estonian texts via OpenAI, Google or OpenRouter APIs. A built‑in mock mode is used when no API keys are provided.
+- API keys and available models for each provider can be entered in the UI. Model lists and pricing are fetched from OpenRouter whenever possible.
 - Synthesize text to audio using the browser Speech Synthesis API (or mock blobs).
 - Transcribe audio back to text. In mock mode the app tries to use the browser's built‑in speech recognition service and falls back to a randomised transcript when unavailable.
 - Compute the Word Error Rate (WER) between the generated text and transcription.
@@ -38,6 +38,8 @@ npm test
 - Publish individual ASR result rows to a configurable Google Sheet.
 - Publishing requires signing in with Google using an OAuth client ID.
 - Results are persisted in browser local storage.
-- View latest model pricing information in a dedicated tab.
+- Browse OpenRouter models in a dedicated tab. The table shows the sum of
+  prompt and completion pricing for each model.
+- Click any table cell to view a Markdown preview of its contents.
 
 This is not a production-ready system but demonstrates the flow described in the specification.

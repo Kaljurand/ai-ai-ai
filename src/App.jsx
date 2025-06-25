@@ -22,6 +22,9 @@ import {
   CircularProgress,
   Box,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -29,6 +32,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
+import { marked } from 'marked';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -70,25 +74,43 @@ function makeMockTranscription(text) {
   return out.join(' ');
 }
 
-function PersistedGrid({ storageKey, ...props }) {
+function PersistedGrid({ storageKey, t, ...props }) {
   const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
   const [filterModel, setFilterModel] = useStoredState(storageKey + 'Filter', { items: [] });
   const [cols, setCols] = useStoredState(storageKey + 'Cols', {});
+  const [preview, setPreview] = useState('');
+  const [open, setOpen] = useState(false);
+  const html = React.useMemo(() => marked.parse(preview || ''), [preview]);
+  const handleCellClick = params => {
+    if (typeof params.value === 'string' && params.value) {
+      setPreview(params.value);
+      setOpen(true);
+    }
+  };
   return (
-    <DataGrid
-      autoHeight
-      getRowHeight={() => 'auto'}
-      disableRowSelectionOnClick
-      sx={{ '& .MuiDataGrid-cell': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}
-      sortingOrder={['asc', 'desc']}
-      sortModel={sortModel}
-      onSortModelChange={setSortModel}
-      filterModel={filterModel}
-      onFilterModelChange={setFilterModel}
-      columnVisibilityModel={cols}
-      onColumnVisibilityModelChange={setCols}
-      {...props}
-    />
+    <>
+      <DataGrid
+        autoHeight
+        getRowHeight={() => 'auto'}
+        disableRowSelectionOnClick
+        sx={{ '& .MuiDataGrid-cell': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}
+        sortingOrder={['asc', 'desc']}
+        sortModel={sortModel}
+        onSortModelChange={setSortModel}
+        filterModel={filterModel}
+        onFilterModelChange={setFilterModel}
+        columnVisibilityModel={cols}
+        onColumnVisibilityModelChange={setCols}
+        onCellClick={handleCellClick}
+        {...props}
+      />
+      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{t('preview')}</DialogTitle>
+        <DialogContent dividers>
+          <div dangerouslySetInnerHTML={{ __html: html }} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -136,7 +158,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Log',
     tabSettings: 'Settings',
-    tabPrices: 'Prices',
+    tabModels: 'Models',
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
     demoPromptLabel: 'Demo prompts',
@@ -173,6 +195,7 @@ const translations = {
     clearData: 'Clear Data',
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
+    openrouterKey: 'OpenRouter API key',
     sheetUrl: 'Google Sheet URL',
     publish: 'Publish',
     googleClientId: 'Google Client ID',
@@ -181,10 +204,16 @@ const translations = {
     language: 'Language',
     darkMode: 'Dark mode',
     mockMode: 'Mock mode active: no API key',
+    preview: 'Preview',
     close: 'Close',
     storageFailed: 'Not stored',
     priceModel: 'Model',
-    pricePerM: 'USD per 1M tokens'
+    pricePerM: 'USD per 1M tokens',
+    modelId: 'ID',
+    modelName: 'Name',
+    modelDesc: 'Description',
+    modality: 'Modality',
+    pricing: 'Pricing'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -193,7 +222,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Logi',
     tabSettings: 'Seaded',
-    tabPrices: 'Hinnad',
+    tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
@@ -230,6 +259,7 @@ const translations = {
     clearData: 'Puhasta andmed',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
+    openrouterKey: 'OpenRouter API v\u00f5ti',
     sheetUrl: 'Google Sheeti URL',
     publish: 'Avalda',
     googleClientId: 'Google kliendi ID',
@@ -238,10 +268,16 @@ const translations = {
     language: 'Keel',
     darkMode: 'Tume re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
+    preview: 'Eelvaade',
     close: 'Sulge',
     storageFailed: 'Salvestus eba\u00f5nnestus',
     priceModel: 'Mudel',
-    pricePerM: 'USD 1M tokeni kohta'
+    pricePerM: 'USD 1M tokeni kohta',
+    modelId: 'ID',
+    modelName: 'Nimi',
+    modelDesc: 'Kirjeldus',
+    modality: 'Modaliteet',
+    pricing: 'Hind'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -250,7 +286,7 @@ const translations = {
     tabAsr: 'ASR',
     tabLog: 'Logi',
     tabSettings: 'S\u00f6tmis',
-    tabPrices: 'Hinnad',
+    tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     demoPromptLabel: 'Demopromptid',
@@ -287,6 +323,7 @@ const translations = {
     clearData: 'Puhasta andmed',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
+    openrouterKey: 'OpenRouter API v\u00f5ti',
     sheetUrl: 'Google Sheeti URL',
     publish: 'Avalda',
     googleClientId: 'Google kliendi ID',
@@ -295,10 +332,16 @@ const translations = {
     language: 'Kiil',
     darkMode: 'Tummas re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
+    preview: 'Eelvaot\u00f5',
     close: 'Sulge',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
-    pricePerM: 'USD 1M tokeni p\u00e4\u00e4le'
+    pricePerM: 'USD 1M tokeni p\u00e4\u00e4le',
+    modelId: 'ID',
+    modelName: 'Nimi',
+    modelDesc: 'Kirjeldus',
+    modality: 'Modaliteet',
+    pricing: 'Hind'
   }
 };
 
@@ -309,7 +352,7 @@ function useTranslation() {
 }
 
 export default function App({ darkMode, setDarkMode }) {
-  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '' });
+  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '', openrouter: '' });
   const [sheetUrl, setSheetUrl] = useStoredState('sheetUrl', '');
   const [googleClientId, setGoogleClientId] = useStoredState('googleClientId', '');
   const [googleToken, setGoogleToken] = useStoredState('googleToken', '');
@@ -322,6 +365,8 @@ export default function App({ darkMode, setDarkMode }) {
   const [provider, setProvider] = useStoredState('provider', 'openai');
   const [openAiModels, setOpenAiModels] = useState([]);
   const [googleModels, setGoogleModels] = useState([]);
+  const [openRouterModels, setOpenRouterModels] = useState([]);
+  const [openRouterMap, setOpenRouterMap] = useState({});
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
   const [textPrompt, setTextPrompt] = useStoredState('textPrompt', 'Generate a realistic Estonian weather report');
@@ -390,6 +435,9 @@ export default function App({ darkMode, setDarkMode }) {
   }, [texts]);
 
   const textModelsList = [
+    ...openRouterModels
+      .filter(m => m.architecture?.modality === 'text->text')
+      .map(m => ({ id: m.base, provider: 'openrouter' })),
     ...openAiModels.map(m => ({ id: m, provider: 'openai' })),
     ...googleModels.map(m => ({ id: m, provider: 'google' }))
   ];
@@ -449,7 +497,7 @@ export default function App({ darkMode, setDarkMode }) {
     a.src = url;
   });
 
-  const mockMode = !apiKeys.openai && !apiKeys.google;
+  const mockMode = !apiKeys.openai && !apiKeys.google && !apiKeys.openrouter;
 
   const signInGoogle = () => {
     if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
@@ -469,6 +517,37 @@ export default function App({ darkMode, setDarkMode }) {
   };
 
   const signOutGoogle = () => setGoogleToken('');
+
+  useEffect(() => {
+    (async () => {
+      const url = 'https://openrouter.ai/api/v1/models';
+      try {
+        const res = await fetchWithLoading(url);
+        const data = await res.json().catch(() => ({}));
+        addLog('GET', url, '', data);
+        if (!res.ok) throw new Error(data.error?.message || data.detail || 'Failed to fetch OpenRouter models');
+        const models = (data.data || []).map(m => ({ ...m, base: m.id.split('/').pop() }));
+        if (models.length) {
+          setOpenRouterModels(models);
+          const map = {};
+          models.forEach(m => { map[m.base] = m; });
+          setOpenRouterMap(map);
+          const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({ id: m.base, name: m.id, cost: m.pricing?.prompt || '', provider: 'openrouter' }));
+          if (tts.length) {
+            setTtsModels(t => [...t.filter(x => !tts.some(v => v.id === x.id)), ...tts]);
+            if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
+          }
+          const asr = models.filter(m => /whisper|asr|speech|transcribe|audio/i.test(m.id)).map(m => ({ id: m.base, name: m.id, provider: 'openrouter' }));
+          if (asr.length) {
+            setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
+            if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
+          }
+        }
+      } catch (e) {
+        showError(e.message);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!apiKeys.openai) return;
@@ -574,7 +653,19 @@ export default function App({ darkMode, setDarkMode }) {
         setTexts(t => [...t, { provider: model, text: mock, prompt: textPrompt, timestamp }]);
         continue;
       }
-      if (googleModels.includes(model)) {
+      if (openRouterMap[model]) {
+        const orModel = openRouterMap[model].id;
+        const body = { model: orModel, messages: [{ role: 'user', content: textPrompt }] };
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+        const url = 'https://openrouter.ai/api/v1/chat/completions';
+        const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        addLog('POST', url, body, data);
+        if (!res.ok) { showError(data.error?.message || 'Text generation failed'); continue; }
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) setTexts(t => [...t, { provider: model, text, prompt: textPrompt, timestamp }]);
+      } else if (googleModels.includes(model)) {
         const body = { prompt: { text: textPrompt } };
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateText?key=${apiKeys.google}`;
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -646,6 +737,24 @@ export default function App({ darkMode, setDarkMode }) {
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
+      } else if (openRouterMap[model]) {
+        const orModel = openRouterMap[model].id;
+        const url = 'https://openrouter.ai/api/v1/audio/speech';
+        const body = { model: orModel, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+        const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          addLog('POST', url, body, err, cost);
+          showError(err.error?.message || 'TTS request failed');
+          continue;
+        }
+        const blob = await res.blob();
+        addLog('POST', url, body, '<audio>', cost);
+        const data = await blobToDataUrl(blob);
+        const duration = await audioDuration(data);
+        setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
       } else if (openAiModels.includes(model)) {
         const url = 'https://api.openai.com/v1/audio/speech';
         const body = { model, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
@@ -689,7 +798,26 @@ export default function App({ darkMode, setDarkMode }) {
         finish(text, 'mock');
         continue;
       }
-      if (openAiModels.includes(model)) {
+      if (openRouterMap[model]) {
+        const orModel = openRouterMap[model].id;
+        const form = new FormData();
+        form.append('model', orModel);
+        form.append('file', blob, 'audio.webm');
+        if (asrPrompt) form.append('prompt', asrPrompt);
+        try {
+          const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
+          const headers = {};
+          if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+          const res = await fetchWithLoading(url, { method: 'POST', headers, body: form });
+          const data = await res.json().catch(() => ({}));
+          addLog('POST', url, '<audio>', data);
+          if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
+          const text = data.text?.trim();
+          if (text) finish(text, model);
+        } catch (e) {
+          showError(e.message);
+        }
+      } else if (openAiModels.includes(model)) {
         const form = new FormData();
         form.append('model', model);
         form.append('file', blob, 'audio.webm');
@@ -919,17 +1047,29 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const priceRows = [
-    { id: 0, provider: 'google', model: 'gemini-1.5-flash', price: 0.35 },
-    { id: 1, provider: 'openai', model: 'gpt-3.5-turbo-0125', price: 0.5 },
-    { id: 2, provider: 'openai', model: 'gpt-4o-mini', price: 1 },
-    { id: 3, provider: 'google', model: 'gemini-1.5-pro', price: 3 },
-    { id: 4, provider: 'openai', model: 'gpt-4o', price: 5 }
-  ];
-  const priceColumns = [
-    { field: 'provider', headerName: t('source'), width: 120, renderCell },
-    { field: 'model', headerName: t('priceModel'), flex: 1, renderCell },
-    { field: 'price', headerName: t('pricePerM'), width: 150, renderCell: p => `$${p.value.toFixed(2)}` }
+  const modelRows = React.useMemo(
+    () =>
+      openRouterModels.map((m, i) => {
+        const prompt = parseFloat(m.pricing?.prompt || 0);
+        const completion = parseFloat(m.pricing?.completion || 0);
+        const pricing = prompt + completion;
+        return {
+          id: i,
+          modelId: m.id,
+          name: m.name,
+          description: m.description,
+          modality: m.architecture?.modality || '',
+          pricing: pricing || ''
+        };
+      }),
+    [openRouterModels]
+  );
+  const modelColumns = [
+    { field: 'modelId', headerName: t('modelId'), width: 200, renderCell },
+    { field: 'name', headerName: t('modelName'), width: 200, renderCell },
+    { field: 'description', headerName: t('modelDesc'), flex: 1, renderCell },
+    { field: 'modality', headerName: t('modality'), width: 120, renderCell },
+    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell }
   ];
 
 
@@ -944,7 +1084,7 @@ export default function App({ darkMode, setDarkMode }) {
             <Tab value="audio" label={t('tabAudio')} />
             <Tab value="asr" label={t('tabAsr')} />
             <Tab value="log" label={t('tabLog')} />
-            <Tab value="prices" label={t('tabPrices')} />
+            <Tab value="models" label={t('tabModels')} />
             <Tab value="config" label={t('tabSettings')} />
           </Tabs>
           {loadingCount > 0 && (
@@ -992,6 +1132,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="texts"
             rows={textRows}
             columns={textColumns}
+            t={t}
           />
         </div>
       )}
@@ -1045,6 +1186,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="audios"
             rows={audioRows}
             columns={audioColumns}
+            t={t}
           />
           {status && <p>{status}</p>}
         </div>
@@ -1072,17 +1214,19 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="results"
             rows={resultRows}
             columns={resultColumns}
+            t={t}
           />
           {status && <p>{status}</p>}
         </div>
       )}
-      {view === 'prices' && (
+      {view === 'models' && (
         <div style={{ padding: '1rem' }}>
-          <ExportButtons rows={priceRows} columns={priceColumns} name="prices" t={t} />
+          <ExportButtons rows={modelRows} columns={modelColumns} name="models" t={t} />
           <PersistedGrid
-            storageKey="prices"
-            rows={priceRows}
-            columns={priceColumns}
+            storageKey="models"
+            rows={modelRows}
+            columns={modelColumns}
+            t={t}
           />
         </div>
       )}
@@ -1094,6 +1238,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="logs"
             rows={logRows}
             columns={logColumns}
+            t={t}
           />
         </div>
       )}
@@ -1112,6 +1257,14 @@ export default function App({ darkMode, setDarkMode }) {
             type="password"
             value={apiKeys.google}
             onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label={t('openrouterKey')}
+            type="password"
+            value={apiKeys.openrouter}
+            onChange={e => setApiKeys({ ...apiKeys, openrouter: e.target.value })}
             fullWidth
             margin="normal"
           />
