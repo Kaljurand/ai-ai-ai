@@ -22,6 +22,9 @@ import {
   CircularProgress,
   Box,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -29,6 +32,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
+import { marked } from 'marked';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -70,25 +74,43 @@ function makeMockTranscription(text) {
   return out.join(' ');
 }
 
-function PersistedGrid({ storageKey, ...props }) {
+function PersistedGrid({ storageKey, t, ...props }) {
   const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
   const [filterModel, setFilterModel] = useStoredState(storageKey + 'Filter', { items: [] });
   const [cols, setCols] = useStoredState(storageKey + 'Cols', {});
+  const [preview, setPreview] = useState('');
+  const [open, setOpen] = useState(false);
+  const html = React.useMemo(() => marked.parse(preview || ''), [preview]);
+  const handleCellClick = params => {
+    if (typeof params.value === 'string' && params.value) {
+      setPreview(params.value);
+      setOpen(true);
+    }
+  };
   return (
-    <DataGrid
-      autoHeight
-      getRowHeight={() => 'auto'}
-      disableRowSelectionOnClick
-      sx={{ '& .MuiDataGrid-cell': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}
-      sortingOrder={['asc', 'desc']}
-      sortModel={sortModel}
-      onSortModelChange={setSortModel}
-      filterModel={filterModel}
-      onFilterModelChange={setFilterModel}
-      columnVisibilityModel={cols}
-      onColumnVisibilityModelChange={setCols}
-      {...props}
-    />
+    <>
+      <DataGrid
+        autoHeight
+        getRowHeight={() => 'auto'}
+        disableRowSelectionOnClick
+        sx={{ '& .MuiDataGrid-cell': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}
+        sortingOrder={['asc', 'desc']}
+        sortModel={sortModel}
+        onSortModelChange={setSortModel}
+        filterModel={filterModel}
+        onFilterModelChange={setFilterModel}
+        columnVisibilityModel={cols}
+        onColumnVisibilityModelChange={setCols}
+        onCellClick={handleCellClick}
+        {...props}
+      />
+      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{t('preview')}</DialogTitle>
+        <DialogContent dividers>
+          <div dangerouslySetInnerHTML={{ __html: html }} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -182,6 +204,7 @@ const translations = {
     language: 'Language',
     darkMode: 'Dark mode',
     mockMode: 'Mock mode active: no API key',
+    preview: 'Preview',
     close: 'Close',
     storageFailed: 'Not stored',
     priceModel: 'Model',
@@ -245,6 +268,7 @@ const translations = {
     language: 'Keel',
     darkMode: 'Tume re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
+    preview: 'Eelvaade',
     close: 'Sulge',
     storageFailed: 'Salvestus eba\u00f5nnestus',
     priceModel: 'Mudel',
@@ -308,6 +332,7 @@ const translations = {
     language: 'Kiil',
     darkMode: 'Tummas re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
+    preview: 'Eelvaot\u00f5',
     close: 'Sulge',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
@@ -1107,6 +1132,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="texts"
             rows={textRows}
             columns={textColumns}
+            t={t}
           />
         </div>
       )}
@@ -1160,6 +1186,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="audios"
             rows={audioRows}
             columns={audioColumns}
+            t={t}
           />
           {status && <p>{status}</p>}
         </div>
@@ -1187,6 +1214,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="results"
             rows={resultRows}
             columns={resultColumns}
+            t={t}
           />
           {status && <p>{status}</p>}
         </div>
@@ -1198,6 +1226,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="models"
             rows={modelRows}
             columns={modelColumns}
+            t={t}
           />
         </div>
       )}
@@ -1209,6 +1238,7 @@ export default function App({ darkMode, setDarkMode }) {
             storageKey="logs"
             rows={logRows}
             columns={logColumns}
+            t={t}
           />
         </div>
       )}

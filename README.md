@@ -40,5 +40,6 @@ npm test
 - Results are persisted in browser local storage.
 - Browse OpenRouter models in a dedicated tab. The table shows the sum of
   prompt and completion pricing for each model.
+- Click any table cell to view a Markdown preview of its contents.
 
 This is not a production-ready system but demonstrates the flow described in the specification.
