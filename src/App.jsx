@@ -730,7 +730,9 @@ export default function App({ darkMode, setDarkMode }) {
   const synthesizeTts = async () => {
     const idx = texts.length;
     const timestamp = new Date().toISOString();
-    const fullPrompt = `${ttsMetaPrompt} ${ttsPrompt}`;
+    const fullPrompt = `${ttsMetaPrompt}
+
+${ttsPrompt}`;
     setTexts([...texts, { provider: 'tts', text: fullPrompt }]);
     for (const model of selectedTtsModels) {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
