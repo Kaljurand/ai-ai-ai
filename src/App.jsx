@@ -206,6 +206,7 @@ const translations = {
     mockMode: 'Mock mode active: no API key',
     preview: 'Preview',
     close: 'Close',
+    selectedModels: 'Models',
     storageFailed: 'Not stored',
     priceModel: 'Model',
     pricePerM: 'USD per 1M tokens',
@@ -270,6 +271,7 @@ const translations = {
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaade',
     close: 'Sulge',
+    selectedModels: 'Mudelid',
     storageFailed: 'Salvestus eba\u00f5nnestus',
     priceModel: 'Mudel',
     pricePerM: 'USD 1M tokeni kohta',
@@ -334,6 +336,7 @@ const translations = {
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaot\u00f5',
     close: 'Sulge',
+    selectedModels: 'Mudelid',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
     pricePerM: 'USD 1M tokeni p\u00e4\u00e4le',
@@ -1047,29 +1050,77 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const modelRows = React.useMemo(
-    () =>
-      openRouterModels.map((m, i) => {
-        const prompt = parseFloat(m.pricing?.prompt || 0);
-        const completion = parseFloat(m.pricing?.completion || 0);
-        const pricing = prompt + completion;
-        return {
-          id: i,
-          modelId: m.id,
-          name: m.name,
-          description: m.description,
-          modality: m.architecture?.modality || '',
-          pricing: pricing || ''
-        };
-      }),
-    [openRouterModels]
-  );
+  const modelRows = React.useMemo(() => {
+    const map = {};
+    textModelsList.forEach(m => {
+      map[m.id] = { id: m.id, provider: m.provider, name: m.id };
+    });
+    ttsModels.forEach(m => {
+      const row = map[m.id] || { id: m.id, provider: m.provider, name: m.name };
+      row.name = m.name;
+      row.audio = true;
+      row.pricing = row.pricing || m.cost || '';
+      map[m.id] = row;
+    });
+    asrModels.forEach(m => {
+      const row = map[m.id] || { id: m.id, provider: m.provider, name: m.name };
+      row.asr = true;
+      map[m.id] = row;
+    });
+    openRouterModels.forEach(m => {
+      const prompt = parseFloat(m.pricing?.prompt || 0);
+      const completion = parseFloat(m.pricing?.completion || 0);
+      const pricing = prompt + completion;
+      const id = m.id.split('/').pop();
+      const row = map[id] || { id, provider: 'openrouter', name: m.name };
+      row.modelId = m.id;
+      row.description = m.description;
+      row.modality = m.architecture?.modality || row.modality;
+      row.pricing = pricing || row.pricing;
+      map[id] = row;
+    });
+    openAiModels.forEach(id => {
+      if (!map[id]) map[id] = { id, provider: 'openai', name: id };
+    });
+    googleModels.forEach(id => {
+      if (!map[id]) map[id] = { id, provider: 'google', name: id };
+    });
+    return Object.values(map).map(r => ({
+      ...r,
+      text: selectedTextModels.includes(r.id),
+      audio: selectedTtsModels.includes(r.id),
+      asr: selectedAsrModels.includes(r.id)
+    }));
+  }, [textModelsList, ttsModels, asrModels, openRouterModels, openAiModels, googleModels, selectedTextModels, selectedTtsModels, selectedAsrModels]);
+
   const modelColumns = [
-    { field: 'modelId', headerName: t('modelId'), width: 200, renderCell },
+    { field: 'id', headerName: t('modelId'), width: 200, renderCell },
+    { field: 'provider', headerName: t('source'), width: 100, renderCell },
     { field: 'name', headerName: t('modelName'), width: 200, renderCell },
     { field: 'description', headerName: t('modelDesc'), flex: 1, renderCell },
     { field: 'modality', headerName: t('modality'), width: 120, renderCell },
-    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell }
+    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell },
+    { field: 'text', headerName: t('tabText'), width: 80, sortable: false, filterable: false,
+      renderCell: params => (
+        <Checkbox size="small" checked={selectedTextModels.includes(params.row.id)} onChange={e => {
+          const checked = e.target.checked;
+          setSelectedTextModels(s => checked ? [...s, params.row.id] : s.filter(v => v !== params.row.id));
+        }} />
+      ) },
+    { field: 'audio', headerName: t('tabAudio'), width: 80, sortable: false, filterable: false,
+      renderCell: params => (
+        <Checkbox size="small" checked={selectedTtsModels.includes(params.row.id)} onChange={e => {
+          const checked = e.target.checked;
+          setSelectedTtsModels(s => checked ? [...s, params.row.id] : s.filter(v => v !== params.row.id));
+        }} />
+      ) },
+    { field: 'asr', headerName: t('tabAsr'), width: 80, sortable: false, filterable: false,
+      renderCell: params => (
+        <Checkbox size="small" checked={selectedAsrModels.includes(params.row.id)} onChange={e => {
+          const checked = e.target.checked;
+          setSelectedAsrModels(s => checked ? [...s, params.row.id] : s.filter(v => v !== params.row.id));
+        }} />
+      ) }
   ];
 
 
@@ -1100,18 +1151,7 @@ export default function App({ darkMode, setDarkMode }) {
       <div style={{ paddingTop: '64px' }}>
       {view === 'text' && (
         <div style={{ padding: '1rem' }}>
-          <Select
-            multiple
-            value={selectedTextModels}
-            onChange={e => setSelectedTextModels(e.target.value)}
-            fullWidth
-            renderValue={s => s.join(', ')}
-            sx={{ fontFamily: 'monospace' }}
-          >
-            {textModelsList.map(m => (
-              <MenuItem key={m.id} value={m.id} sx={{ fontFamily: 'monospace' }}>{`${m.provider} ${m.id}`}</MenuItem>
-            ))}
-          </Select>
+          <Typography variant="subtitle2">{t('selectedModels')}: {selectedTextModels.join(', ')}</Typography>
           <Select
             value={demoPrompt}
             onChange={e => { setDemoPrompt(e.target.value); setTextPrompt(e.target.value); }}
@@ -1160,18 +1200,7 @@ export default function App({ darkMode, setDarkMode }) {
             placeholder="Read the following text as a very fast and energetic sports reporter, kind of like Gunnar Hololei"
           />
           <TextField label={t('ttsPromptLabel')} multiline rows={4} value={ttsPrompt} InputProps={{ readOnly: true }} fullWidth margin="normal" />
-          <Select
-            multiple
-            value={selectedTtsModels}
-            onChange={e => setSelectedTtsModels(e.target.value)}
-            fullWidth
-            renderValue={s => s.join(', ')}
-            sx={{ fontFamily: 'monospace' }}
-          >
-            {ttsModels.map(m => (
-              <MenuItem key={m.id} value={m.id} sx={{ fontFamily: 'monospace' }}>{`${m.provider} ${m.name}${m.cost ? ' (' + m.cost + ')' : ''}`}</MenuItem>
-            ))}
-          </Select>
+          <Typography variant="subtitle2">{t('selectedModels')}: {selectedTtsModels.join(', ')}</Typography>
           <Button size="small" variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
           <Button size="small" component="label" sx={{ mt: 1, ml: 1 }}>
             {t('uploadAudio')}
@@ -1193,18 +1222,7 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'asr' && (
         <div style={{ padding: '1rem' }}>
-          <Select
-            multiple
-            value={selectedAsrModels}
-            onChange={e => setSelectedAsrModels(e.target.value)}
-            fullWidth
-            renderValue={s => s.join(', ')}
-            sx={{ fontFamily: 'monospace' }}
-          >
-            {asrModels.map(m => (
-              <MenuItem key={m.id} value={m.id} sx={{ fontFamily: 'monospace' }}>{`${m.provider} ${m.name}`}</MenuItem>
-            ))}
-          </Select>
+          <Typography variant="subtitle2">{t('selectedModels')}: {selectedAsrModels.join(', ')}</Typography>
           <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t}>
