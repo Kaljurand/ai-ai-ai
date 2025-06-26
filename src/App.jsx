@@ -730,9 +730,7 @@ export default function App({ darkMode, setDarkMode }) {
   const synthesizeTts = async () => {
     const idx = texts.length;
     const timestamp = new Date().toISOString();
-    const fullPrompt = `${ttsMetaPrompt}
-
-${ttsPrompt}`;
+    const fullPrompt = `${ttsMetaPrompt} ${ttsPrompt}`;
     setTexts([...texts, { provider: 'tts', text: fullPrompt }]);
     for (const model of selectedTtsModels) {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
@@ -745,7 +743,13 @@ ${ttsPrompt}`;
       } else if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const url = 'https://openrouter.ai/api/v1/audio/speech';
-        const body = { model: orModel, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
+        const body = {
+          model: orModel,
+          input: ttsPrompt,
+          instructions: ttsMetaPrompt,
+          voice: 'alloy',
+          response_format: 'mp3'
+        };
         const headers = { 'Content-Type': 'application/json' };
         if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
         const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -762,7 +766,13 @@ ${ttsPrompt}`;
         setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
       } else if (openAiModels.includes(model)) {
         const url = 'https://api.openai.com/v1/audio/speech';
-        const body = { model, input: fullPrompt, voice: 'alloy', response_format: 'mp3' };
+        const body = {
+          model,
+          input: ttsPrompt,
+          instructions: ttsMetaPrompt,
+          voice: 'alloy',
+          response_format: 'mp3'
+        };
         const res = await fetchWithLoading(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },

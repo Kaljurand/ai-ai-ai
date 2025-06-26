@@ -29,8 +29,8 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('selectedModels')).toBe(true);
   });
-  it('concatenates TTS instructions and text with double line break', () => {
+  it('uses the instructions field in TTS requests', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(/fullPrompt = `\$\{ttsMetaPrompt\}\n\n\$\{ttsPrompt\}`/.test(code)).toBe(true);
+    expect(/instructions:\s*ttsMetaPrompt/.test(code)).toBe(true);
   });
 });
