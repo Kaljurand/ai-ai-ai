@@ -19,3 +19,9 @@ th, td { border: 1px solid #ccc; padding: 0.25rem; }
   justify-content: space-between;
   z-index: 1201;
 }
+
+.json-key { color: brown; }
+.json-string { color: olive; }
+.json-number { color: teal; }
+.json-boolean { color: blue; }
+.json-null { color: magenta; }
