@@ -25,4 +25,8 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('openrouterKey')).toBe(true);
   });
+  it('formats long JSON values in log entries', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('slice(-50)')).toBe(true);
+  });
 });

@@ -502,12 +502,34 @@ export default function App({ darkMode, setDarkMode }) {
   };
 
   const addLog = (method, url, body = '', response = '', cost = '') => {
-    const short = s => {
+    const shorten = s => {
       if (!s) return '';
       if (typeof s !== 'string') s = JSON.stringify(s);
+      const trimmed = s.trim();
+      if (/^[{\[]/.test(trimmed)) {
+        try {
+          const obj = JSON.parse(trimmed);
+          return JSON.stringify(obj, (k, v) => {
+            if (typeof v === 'string' && v.length > 100) {
+              return v.slice(0, 50) + '...' + v.slice(-50);
+            }
+            return v;
+          });
+        } catch (e) {}
+      }
       return s.length > 60 ? s.slice(0, 30) + '...' + s.slice(-20) : s;
     };
-    setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: short(body), response: short(response), cost }]);
+    setLogs(l => [
+      ...l,
+      {
+        time: new Date().toISOString(),
+        method,
+        url,
+        body: shorten(body),
+        response: shorten(response),
+        cost,
+      },
+    ]);
   };
 
   const fetchWithLoading = async (url, opts) => {
