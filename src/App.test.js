@@ -37,4 +37,8 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('@mui/icons-material/Visibility')).toBe(true);
   });
+  it('includes copy translation', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes("copy: 'Copy'")) .toBe(true);
+  });
 });

@@ -25,6 +25,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
+  InputAdornment,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -34,6 +36,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
 import { marked } from 'marked';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -79,14 +82,30 @@ function PersistedGrid({ storageKey, t, ...props }) {
   const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
   const [filterModel, setFilterModel] = useStoredState(storageKey + 'Filter', { items: [] });
   const [cols, setCols] = useStoredState(storageKey + 'Cols', {});
-  const [preview, setPreview] = useState('');
-  const [open, setOpen] = useState(false);
-  const html = React.useMemo(() => marked.parse(preview || ''), [preview]);
-  const handleCellClick = params => {
-    if (typeof params.value === 'string' && params.value) {
-      setPreview(params.value);
-      setOpen(true);
+  const [previewRow, setPreviewRow] = useState(null);
+  const open = Boolean(previewRow);
+  const html = React.useMemo(() => {
+    if (!previewRow) return '';
+    const val =
+      previewRow.diff ||
+      previewRow.transcription ||
+      previewRow.text ||
+      previewRow.original ||
+      previewRow.body ||
+      previewRow.response || '';
+    if (typeof val === 'string' && val.trim().startsWith('{')) {
+      try {
+        const obj = JSON.parse(val);
+        return `<pre>${marked.parse('```json\n' + JSON.stringify(obj, null, 2) + '\n```')}</pre>`;
+      } catch {
+        return marked.parse(val);
+      }
     }
+    if (val.startsWith('<') && val.includes('</')) return val;
+    return marked.parse(String(val));
+  }, [previewRow]);
+  const handleRowClick = params => {
+    setPreviewRow(params.row);
   };
   return (
     <>
@@ -102,16 +121,27 @@ function PersistedGrid({ storageKey, t, ...props }) {
         onFilterModelChange={setFilterModel}
         columnVisibilityModel={cols}
         onColumnVisibilityModelChange={setCols}
-        onCellClick={handleCellClick}
+        onRowClick={handleRowClick}
         {...props}
       />
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogContent dividers>
-          <Box sx={{ textAlign: 'right' }}>
-            <Button size="small" onClick={() => navigator.clipboard.writeText(preview)}>Copy</Button>
-          </Box>
-          <div dangerouslySetInnerHTML={{ __html: html }} />
-        </DialogContent>
+      <Dialog open={open} onClose={() => setPreviewRow(null)} fullWidth maxWidth="sm">
+        {previewRow && (
+          <>
+            <DialogTitle>
+              {`#${previewRow.id ?? previewRow.i ?? ''} ${previewRow.timestamp || previewRow.time || ''} ${previewRow.provider || previewRow.asrSource || previewRow.audioSource || previewRow.textSource || ''}`}
+            </DialogTitle>
+            <DialogContent dividers>
+              {previewRow.url && (
+                <audio controls src={previewRow.url} style={{ width: '100%', marginBottom: '1em' }} />
+              )}
+              <div dangerouslySetInnerHTML={{ __html: html }} />
+            </DialogContent>
+            <DialogActions>
+              <Button size="small" onClick={() => navigator.clipboard.writeText(typeof previewRow === 'object' ? JSON.stringify(previewRow, null, 2) : '')}>{t('copy')}</Button>
+              <Button size="small" onClick={() => setPreviewRow(null)}>{t('close')}</Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </>
   );
@@ -121,6 +151,12 @@ function renderCell(params) {
   let val = params.value == null ? '' : String(params.value);
   if (/^\d{4}-\d{2}-\d{2}T/.test(val)) {
     val = val.replace('T', ' ').slice(0, 19);
+  }
+  if (/^\s*\{.*\}\s*$/.test(val)) {
+    try { val = JSON.stringify(JSON.parse(val)); } catch {}
+    if (val.length > 30) val = val.slice(0, 15) + '...' + val.slice(-10);
+  } else if (val.length > 50) {
+    val = val.slice(0, 25) + '...' + val.slice(-10);
   }
   const style = { whiteSpace: 'normal', wordWrap: 'break-word' };
   if (['timestamp', 'time', 'provider', 'textSource', 'audioSource', 'asrSource', 'wer'].includes(params.field)) {
@@ -217,6 +253,7 @@ const translations = {
     mockMode: 'Mock mode active: no API key',
     preview: 'Preview',
     close: 'Close',
+    copy: 'Copy',
     selectedModels: 'Models',
     storageFailed: 'Not stored',
     priceModel: 'Model',
@@ -270,9 +307,6 @@ const translations = {
     exportMD: 'Ekspordi Markdown',
     clearData: 'Puhasta andmed',
     clearKeys: 'Puhasta võtmid',
-    keysGroup: 'Võtmid',
-    uiGroup: 'Kasutajaliides',
-    clearKeys: 'Puhasta võtmid',
     keysGroup: 'Võtmed',
     uiGroup: 'Kasutajaliides',
     openaiKey: 'OpenAI API v\u00f5ti',
@@ -288,6 +322,7 @@ const translations = {
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaade',
     close: 'Sulge',
+    copy: 'Kopeeri',
     selectedModels: 'Mudelid',
     storageFailed: 'Salvestus eba\u00f5nnestus',
     priceModel: 'Mudel',
@@ -353,6 +388,7 @@ const translations = {
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaot\u00f5',
     close: 'Sulge',
+    copy: 'Kopeeri',
     selectedModels: 'Mudelid',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
@@ -478,12 +514,21 @@ export default function App({ darkMode, setDarkMode }) {
   };
 
   const addLog = (method, url, body = '', response = '', cost = '') => {
-    const short = s => {
-      if (!s) return '';
-      if (typeof s !== 'string') s = JSON.stringify(s);
-      return s.length > 60 ? s.slice(0, 30) + '...' + s.slice(-20) : s;
+    const truncate = v => {
+      if (typeof v === 'string') {
+        try { v = JSON.parse(v); } catch { return v.length > 50 ? v.slice(0, 25) + '...' + v.slice(-20) : v; }
+      }
+      if (typeof v === 'object' && v) {
+        const out = {};
+        for (const [k, val] of Object.entries(v)) {
+          if (typeof val === 'string' && val.length > 50) out[k] = val.slice(0, 50) + '...';
+          else out[k] = val;
+        }
+        return JSON.stringify(out);
+      }
+      return String(v);
     };
-    setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: short(body), response: short(response), cost }]);
+    setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: truncate(body), response: truncate(response), cost }]);
   };
 
   const fetchWithLoading = async (url, opts) => {
@@ -1208,7 +1253,24 @@ export default function App({ darkMode, setDarkMode }) {
             ))}
             <MenuItem value=""></MenuItem>
           </Select>
-          <TextField label={t('promptForModels')} multiline rows={3} value={textPrompt} onChange={e => setTextPrompt(e.target.value)} fullWidth margin="normal" />
+          <TextField
+            label={t('promptForModels')}
+            multiline
+            rows={3}
+            value={textPrompt}
+            onChange={e => setTextPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(textPrompt)}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
           <Button size="small" onClick={generateTexts}>{t('genPrompt')}</Button>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={textRows} columns={textColumns} name="texts" t={t} />
@@ -1243,8 +1305,34 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             margin="normal"
             placeholder="Read the following text as a very fast and energetic sports reporter, kind of like Gunnar Hololei"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsMetaPrompt)}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
           />
-          <TextField label={t('ttsPromptLabel')} multiline rows={4} value={ttsPrompt} InputProps={{ readOnly: true }} fullWidth margin="normal" />
+          <TextField
+            label={t('ttsPromptLabel')}
+            multiline
+            rows={4}
+            value={ttsPrompt}
+            InputProps={{
+              readOnly: true,
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsPrompt)}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+            fullWidth
+            margin="normal"
+          />
           <Typography variant="subtitle2">{t('selectedModels')}: {selectedTtsModels.join(', ')}</Typography>
           <Button size="small" variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
           <Button size="small" component="label" sx={{ mt: 1, ml: 1 }}>
@@ -1281,7 +1369,24 @@ export default function App({ darkMode, setDarkMode }) {
             ))}
             <MenuItem value=""></MenuItem>
           </Select>
-          <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
+          <TextField
+            label={t('asrPromptLabel')}
+            multiline
+            rows={3}
+            value={asrPrompt}
+            onChange={e => setAsrPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(asrPrompt)}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t}>
             <Button size="small" onClick={clearTables} sx={{ ml: 1 }}>{t('clearData')}</Button>
