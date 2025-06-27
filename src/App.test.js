@@ -41,4 +41,8 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes("copy: 'Copy'")) .toBe(true);
   });
+  it('includes showSelected translation', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('showSelected')).toBe(true);
+  });
 });
