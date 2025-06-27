@@ -106,8 +106,10 @@ function PersistedGrid({ storageKey, t, ...props }) {
         {...props}
       />
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{t('preview')}</DialogTitle>
         <DialogContent dividers>
+          <Box sx={{ textAlign: 'right' }}>
+            <Button size="small" onClick={() => navigator.clipboard.writeText(preview)}>Copy</Button>
+          </Box>
           <div dangerouslySetInnerHTML={{ __html: html }} />
         </DialogContent>
       </Dialog>
@@ -167,8 +169,8 @@ const translations = {
     tabModels: 'Models',
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
-    demoPromptLabel: 'Demo prompts',
-    demoInstrLabel: 'Demo instructions',
+    examplePromptLabel: 'Example prompt',
+    exampleInstrLabel: 'Example prompt',
     uploadPrompt: 'Upload Prompt',
     useText: 'Use for Audio',
     textId: 'ID',
@@ -199,6 +201,9 @@ const translations = {
     exportCSV: 'Export CSV',
     exportMD: 'Export Markdown',
     clearData: 'Clear Data',
+    clearKeys: 'Clear Keys',
+    keysGroup: 'Keys',
+    uiGroup: 'UI',
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
     openrouterKey: 'OpenRouter API key',
@@ -232,8 +237,8 @@ const translations = {
     tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
-    demoPromptLabel: 'Demopromptid',
-    demoInstrLabel: 'Demojuhised',
+    examplePromptLabel: 'Näidis prompt',
+    exampleInstrLabel: 'Näidis prompt',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada helisse',
     textId: 'ID',
@@ -264,6 +269,12 @@ const translations = {
     exportCSV: 'Ekspordi CSV',
     exportMD: 'Ekspordi Markdown',
     clearData: 'Puhasta andmed',
+    clearKeys: 'Puhasta võtmid',
+    keysGroup: 'Võtmid',
+    uiGroup: 'Kasutajaliides',
+    clearKeys: 'Puhasta võtmid',
+    keysGroup: 'Võtmed',
+    uiGroup: 'Kasutajaliides',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
@@ -297,8 +308,8 @@ const translations = {
     tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
-    demoPromptLabel: 'Demopromptid',
-    demoInstrLabel: 'Demojuhised',
+    examplePromptLabel: 'Näütüs prompt',
+    exampleInstrLabel: 'Näütüs prompt',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada h\u00e4\u00e4le',
     textId: 'ID',
@@ -950,9 +961,23 @@ export default function App({ darkMode, setDarkMode }) {
     setNewText('');
   };
 
-  const clearData = () => {
-    localStorage.clear();
-    setTexts([]); setAudios([]); setTranscripts([]);
+  const clearTables = () => {
+    const keys = [
+      'texts', 'audios', 'transcripts', 'logs',
+      'textsSort', 'textsFilter', 'textsCols',
+      'audiosSort', 'audiosFilter', 'audiosCols',
+      'resultsSort', 'resultsFilter', 'resultsCols',
+      'modelsSort', 'modelsFilter', 'modelsCols',
+      'logsSort', 'logsFilter', 'logsCols'
+    ];
+    keys.forEach(k => localStorage.removeItem(k));
+    setTexts([]); setAudios([]); setTranscripts([]); setLogs([]);
+  };
+
+  const clearKeys = () => {
+    clearTables();
+    localStorage.removeItem('apiKeys');
+    setApiKeys({ openai: '', google: '', openrouter: '' });
   };
 
   const rows = transcriptsToRows(transcripts, audios, texts);
@@ -1177,10 +1202,11 @@ export default function App({ darkMode, setDarkMode }) {
             displayEmpty
             sx={{ mt: 1 }}
           >
-            <MenuItem value="" disabled>{t('demoPromptLabel')}</MenuItem>
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
             {predefinedPrompts.map((p, i) => (
               <MenuItem key={i} value={p}>{p}</MenuItem>
             ))}
+            <MenuItem value=""></MenuItem>
           </Select>
           <TextField label={t('promptForModels')} multiline rows={3} value={textPrompt} onChange={e => setTextPrompt(e.target.value)} fullWidth margin="normal" />
           <Button size="small" onClick={generateTexts}>{t('genPrompt')}</Button>
@@ -1202,10 +1228,11 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             displayEmpty
           >
-            <MenuItem value="" disabled>{t('demoInstrLabel')}</MenuItem>
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
             {predefinedInstructions.map((p, i) => (
               <MenuItem key={i} value={p}>{p}</MenuItem>
             ))}
+            <MenuItem value=""></MenuItem>
           </Select>
           <TextField
             label={t('metaPromptLabel')}
@@ -1241,10 +1268,23 @@ export default function App({ darkMode, setDarkMode }) {
       {view === 'asr' && (
         <div style={{ padding: '1rem' }}>
           <Typography variant="subtitle2">{t('selectedModels')}: {selectedAsrModels.join(', ')}</Typography>
+          <Select
+            value={demoPrompt}
+            onChange={e => { setDemoPrompt(e.target.value); setAsrPrompt(e.target.value); }}
+            fullWidth
+            displayEmpty
+            sx={{ mt: 1 }}
+          >
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
+            {predefinedPrompts.map((p, i) => (
+              <MenuItem key={i} value={p}>{p}</MenuItem>
+            ))}
+            <MenuItem value=""></MenuItem>
+          </Select>
           <TextField label={t('asrPromptLabel')} multiline rows={3} value={asrPrompt} onChange={e => setAsrPrompt(e.target.value)} fullWidth margin="normal" />
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t}>
-            <Button size="small" onClick={clearData} sx={{ ml: 1 }}>{t('clearData')}</Button>
+            <Button size="small" onClick={clearTables} sx={{ ml: 1 }}>{t('clearData')}</Button>
           </ExportButtons>
           <PersistedGrid
             storageKey="results"
@@ -1280,6 +1320,7 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'config' && (
         <div style={{ padding: '1rem' }}>
+          <Divider textAlign="left" sx={{ mb: 1 }}>{t('keysGroup')}</Divider>
           <TextField
             label={t('openaiKey')}
             type="password"
@@ -1323,6 +1364,7 @@ export default function App({ darkMode, setDarkMode }) {
           ) : (
             <Button size="small" onClick={signInGoogle} sx={{ mt: 1 }}>{t('signIn')}</Button>
           )}
+          <Divider textAlign="left" sx={{ my: 2 }}>{t('uiGroup')}</Divider>
           <FormControlLabel
             control={<Switch checked={darkMode} onChange={e => setDarkMode(e.target.checked)} />}
             label={t('darkMode')}
@@ -1334,6 +1376,10 @@ export default function App({ darkMode, setDarkMode }) {
             <MenuItem value="vro">V\u00f5ro</MenuItem>
           </Select>
           {mockMode && <Typography color="error">{t('mockMode')}</Typography>}
+          <Box sx={{ mt: 2 }}>
+            <Button size="small" onClick={clearTables}>{t('clearData')}</Button>
+            <Button size="small" onClick={clearKeys} sx={{ ml: 1 }}>{t('clearKeys')}</Button>
+          </Box>
         </div>
       )}
       </div>
