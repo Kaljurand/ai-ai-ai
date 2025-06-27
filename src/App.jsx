@@ -27,6 +27,7 @@ import {
   DialogContent,
   DialogActions,
   InputAdornment,
+  FormGroup,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -256,6 +257,7 @@ const translations = {
     preview: 'Preview',
     close: 'Close',
     copy: 'Copy',
+    showSelected: 'Show selected only',
     selectedModels: 'Models',
     storageFailed: 'Not stored',
     priceModel: 'Model',
@@ -325,6 +327,7 @@ const translations = {
     preview: 'Eelvaade',
     close: 'Sulge',
     copy: 'Kopeeri',
+    showSelected: 'Ainult valitud',
     selectedModels: 'Mudelid',
     storageFailed: 'Salvestus eba\u00f5nnestus',
     priceModel: 'Mudel',
@@ -391,6 +394,7 @@ const translations = {
     preview: 'Eelvaot\u00f5',
     close: 'Sulge',
     copy: 'Kopeeri',
+    showSelected: 'Ainult valitud',
     selectedModels: 'Mudelid',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
@@ -443,6 +447,7 @@ export default function App({ darkMode, setDarkMode }) {
   const [ttsMetaPrompt, setTtsMetaPrompt] = useStoredState('ttsMetaPrompt', 'Convert the following text to audio speaking in double speed:');
   const [asrModels, setAsrModels] = useState([]);
   const [selectedAsrModels, setSelectedAsrModels] = useStoredState('selectedAsrModels', []);
+  const [showSelectedOnly, setShowSelectedOnly] = useStoredState('modelsShowSelected', false);
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const [loadingCount, setLoadingCount] = useState(0);
@@ -1183,6 +1188,11 @@ export default function App({ darkMode, setDarkMode }) {
     }));
   }, [textModelsList, ttsModels, asrModels, openRouterModels, openAiModels, googleModels, selectedTextModels, selectedTtsModels, selectedAsrModels]);
 
+  const filteredModelRows = React.useMemo(
+    () => showSelectedOnly ? modelRows.filter(r => r.text || r.audio || r.asr) : modelRows,
+    [modelRows, showSelectedOnly]
+  );
+
   const modelColumns = [
     { field: 'id', headerName: t('modelId'), width: 200, renderCell },
     { field: 'provider', headerName: t('source'), width: 100, renderCell },
@@ -1404,10 +1414,15 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'models' && (
         <div style={{ padding: '1rem' }}>
-          <ExportButtons rows={modelRows} columns={modelColumns} name="models" t={t} />
+          <FormControlLabel
+            control={<Switch checked={showSelectedOnly} onChange={e => setShowSelectedOnly(e.target.checked)} />}
+            label={t('showSelected')}
+            sx={{ mb: 1 }}
+          />
+          <ExportButtons rows={filteredModelRows} columns={modelColumns} name="models" t={t} />
           <PersistedGrid
             storageKey="models"
-            rows={modelRows}
+            rows={filteredModelRows}
             columns={modelColumns}
             t={t}
           />
