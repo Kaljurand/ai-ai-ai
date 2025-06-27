@@ -101,7 +101,9 @@ function PersistedGrid({ storageKey, t, ...props }) {
         return marked.parse(val);
       }
     }
-    if (val.startsWith('<') && val.includes('</')) return val;
+    if (typeof val === 'string' && val.startsWith('<') && val.includes('</')) {
+      return val;
+    }
     return marked.parse(String(val));
   }, [previewRow]);
   const handleRowClick = params => {
