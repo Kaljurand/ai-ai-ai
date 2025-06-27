@@ -33,6 +33,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
 import { marked } from 'marked';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -125,7 +126,12 @@ function renderCell(params) {
   }
   return (
     <Tooltip title={val} placement="top">
-      <span style={style}>{val}</span>
+      <span style={style}>
+        {val}
+        {typeof params.value === 'string' && params.value && (
+          <VisibilityIcon sx={{ ml: 0.5, fontSize: '1em', verticalAlign: 'middle', color: 'action.disabled' }} />
+        )}
+      </span>
     </Tooltip>
   );
 }
