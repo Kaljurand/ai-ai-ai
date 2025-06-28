@@ -1357,7 +1357,14 @@ export default function App({ darkMode, setDarkMode }) {
         <Toolbar>
           <PlaygroundIcon sx={{ mr: 1 }} />
           <Typography variant="h6" sx={{ flexGrow: 1 }}>{t('appTitle')}</Typography>
-          <Tabs value={view} onChange={(e, v) => setView(v)} textColor="inherit" indicatorColor="secondary">
+          <Tabs
+            value={view}
+            onChange={(e, v) => setView(v)}
+            textColor="inherit"
+            indicatorColor="secondary"
+            variant="scrollable"
+            scrollButtons="auto"
+          >
             <Tab value="text" label={t('tabText')} />
             <Tab value="audio" label={t('tabAudio')} />
             <Tab value="asr" label={t('tabAsr')} />
@@ -1375,9 +1382,9 @@ export default function App({ darkMode, setDarkMode }) {
           )}
         </Toolbar>
       </AppBar>
-      <div style={{ paddingTop: '64px' }}>
+      <Box sx={{ pt: { xs: '56px', sm: '64px' } }}>
       {view === 'text' && (
-        <div style={{ padding: '1rem' }}>
+        <div className="content">
           <Typography variant="subtitle2">{t('selectedModels')}: {selectedTextModels.join(', ')}</Typography>
           <Select
             value={demoPrompt}
@@ -1422,7 +1429,7 @@ export default function App({ darkMode, setDarkMode }) {
         </div>
       )}
       {view === 'audio' && (
-        <div style={{ padding: '1rem' }}>
+        <div className="content">
           <Select
             value={demoInstruction}
             onChange={e => { setDemoInstruction(e.target.value); setTtsMetaPrompt(e.target.value); }}
@@ -1493,7 +1500,7 @@ export default function App({ darkMode, setDarkMode }) {
         </div>
       )}
       {view === 'asr' && (
-        <div style={{ padding: '1rem' }}>
+        <div className="content">
           <Typography variant="subtitle2">{t('selectedModels')}: {selectedAsrModels.join(', ')}</Typography>
           <Select
             value={demoPrompt}
@@ -1540,7 +1547,7 @@ export default function App({ darkMode, setDarkMode }) {
         </div>
       )}
       {view === 'models' && (
-        <div style={{ padding: '1rem' }}>
+        <div className="content">
           <FormControlLabel
             control={<Switch checked={showSelectedOnly} onChange={e => setShowSelectedOnly(e.target.checked)} />}
             label={t('showSelected')}
@@ -1556,7 +1563,7 @@ export default function App({ darkMode, setDarkMode }) {
         </div>
       )}
       {view === 'log' && (
-        <div style={{ padding: '1rem' }}>
+        <div className="content">
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={logRows} columns={logColumns} name="logs" t={t} />
           <PersistedGrid
@@ -1569,7 +1576,7 @@ export default function App({ darkMode, setDarkMode }) {
         </div>
       )}
       {view === 'config' && (
-        <div style={{ padding: '1rem' }}>
+        <div className="content">
           <Divider textAlign="left" sx={{ mb: 1 }}>{t('keysGroup')}</Divider>
           <TextField
             label={t('openaiKey')}
@@ -1634,7 +1641,7 @@ export default function App({ darkMode, setDarkMode }) {
           </Box>
         </div>
       )}
-      </div>
+      </Box>
       {errors.length > 0 && (
         <div className="error-bar">
           <span>{errors.join(' | ')}</span>
