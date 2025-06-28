@@ -37,10 +37,6 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('@mui/icons-material/Visibility')).toBe(true);
   });
-  it('includes copy translation', () => {
-    const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(code.includes("copy: 'Copy'")) .toBe(true);
-  });
   it('includes showSelected translation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('showSelected')).toBe(true);
@@ -48,10 +44,6 @@ describe('App.jsx compilation', () => {
   it('includes duration translation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('duration')).toBe(true);
-  });
-  it('includes showOngoing translation', () => {
-    const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(code.includes('showOngoing')).toBe(true);
   });
   it('uses pending rows', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
@@ -61,6 +53,11 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('react-draggable')).toBe(true);
     expect(code.includes('onCellClick')).toBe(true);
+  });
+  it('renders row actions in the dialog', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes(".find(c => c.field === 'actions').renderCell"))
+      .toBe(true);
   });
   it('stops row click propagation on action buttons', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');

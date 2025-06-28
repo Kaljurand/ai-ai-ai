@@ -95,30 +95,36 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
   const [cols, setCols] = useStoredState(storageKey + 'Cols', initialCols);
   const [previewRow, setPreviewRow] = useState(null);
   const open = Boolean(previewRow);
+  const renderValue = val => {
+    if (val == null) return '';
+    if (typeof val === 'object') {
+      return `<pre>${marked.parse('```json\n' + JSON.stringify(val, null, 2) + '\n```')}</pre>`;
+    }
+    const s = String(val);
+    if (s.trim().startsWith('{')) {
+      try {
+        return `<pre>${marked.parse('```json\n' + JSON.stringify(JSON.parse(s), null, 2) + '\n```')}</pre>`;
+      } catch {}
+    }
+    if (s.trim().startsWith('<') && s.includes('</')) return s;
+    return marked.parse(s);
+  };
   const renderFields = row =>
     props.columns
-      .filter(c => c.field !== 'actions' && row[c.field] != null && c.field !== 'url')
+      .filter(c => c.field !== 'actions' && row[c.field] != null)
       .map(c => {
-        const val = String(row[c.field]);
+        const raw = row[c.field];
+        const html = renderValue(raw);
         return (
-          <TextField
-            key={c.field}
-            label={c.headerName || c.field}
-            value={val}
-            multiline
-            fullWidth
-            margin="dense"
-            InputProps={{
-              readOnly: true,
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(val)}>
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
+          <Box key={c.field} sx={{ mb: 1 }}>
+            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center' }}>
+              {c.headerName || c.field}
+              <IconButton size="small" onClick={() => navigator.clipboard.writeText(typeof raw === 'object' ? JSON.stringify(raw, null, 2) : String(raw))}>
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Typography>
+            <div dangerouslySetInnerHTML={{ __html: html }} />
+          </Box>
         );
       });
   const html = React.useMemo(() => {
@@ -179,10 +185,11 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
               )}
               {renderFields(previewRow)}
             </DialogContent>
-            <DialogActions>
-              <Button size="small" onClick={() => navigator.clipboard.writeText(typeof previewRow === 'object' ? JSON.stringify(previewRow, null, 2) : '')}>{t('copy')}</Button>
-              <Button size="small" onClick={() => setPreviewRow(null)}>{t('close')}</Button>
-            </DialogActions>
+            {props.columns.some(c => c.field === 'actions') && (
+              <DialogActions sx={{ justifyContent: 'flex-start' }}>
+                {props.columns.find(c => c.field === 'actions').renderCell({ row: previewRow })}
+              </DialogActions>
+            )}
           </>
         )}
       </Dialog>
@@ -309,8 +316,6 @@ const translations = {
     darkMode: 'Dark mode',
     mockMode: 'Mock mode active: no API key',
     preview: 'Preview',
-    close: 'Close',
-    copy: 'Copy',
     showSelected: 'Show selected only',
     selectedModels: 'Models',
     storageFailed: 'Not stored',
@@ -321,8 +326,7 @@ const translations = {
     modelDesc: 'Description',
     modality: 'Modality',
     pricing: 'Pricing',
-    duration: 'Duration',
-    showOngoing: 'Show ongoing'
+    duration: 'Duration'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -381,8 +385,6 @@ const translations = {
     darkMode: 'Tume re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaade',
-    close: 'Sulge',
-    copy: 'Kopeeri',
     showSelected: 'Ainult valitud',
     selectedModels: 'Mudelid',
     storageFailed: 'Salvestus eba\u00f5nnestus',
@@ -394,7 +396,6 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
-    showOngoing: 'Ainult k\u00e4iv'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -450,8 +451,6 @@ const translations = {
     darkMode: 'Tummas re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaot\u00f5',
-    close: 'Sulge',
-    copy: 'Kopeeri',
     showSelected: 'Ainult valitud',
     selectedModels: 'Mudelid',
     storageFailed: 'Salvestus epa\u00f5nnestus',
@@ -463,7 +462,6 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
-    showOngoing: 'Ainult k\u00e4\u00fcmis'
   }
 };
 
@@ -513,7 +511,6 @@ export default function App({ darkMode, setDarkMode }) {
   const [loadingCount, setLoadingCount] = useState(0);
   const [errors, setErrors] = useState([]);
   const [logs, setLogs] = useStoredState('logs', []);
-  const [showOngoingOnly, setShowOngoingOnly] = useStoredState('logsOngoing', false);
 
   const predefinedPrompts = [
     'write an Estonian haiku in the style of Jaan Pehk',
@@ -1232,7 +1229,7 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const logRows = (showOngoingOnly ? logs.filter(l => l.pending) : logs).map((l, i) => ({ id: i, ...l }));
+  const logRows = logs.map((l, i) => ({ id: i, ...l }));
   const logColumns = [
     { field: 'model', headerName: t('modelName'), width: 150, renderCell },
     { field: 'time', headerName: t('timestamp'), width: 180, renderCell },
@@ -1539,11 +1536,6 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'log' && (
         <div style={{ padding: '1rem' }}>
-          <FormControlLabel
-            control={<Switch checked={showOngoingOnly} disabled={!logs.some(l => l.pending)} onChange={e => setShowOngoingOnly(e.target.checked)} />}
-            label={t('showOngoing')}
-            sx={{ mb: 1 }}
-          />
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={logRows} columns={logColumns} name="logs" t={t} />
           <PersistedGrid
