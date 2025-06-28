@@ -34,9 +34,7 @@ npm test
 - Compute the Word Error Rate (WER) between the generated text and transcription.
 - Visual diff view highlighting transcription errors.
 - Users can add their own texts, edit generated ones and upload audio files.
-- Export results as JSON or CSV and clear all stored data.
-- Publish individual ASR result rows to a configurable Google Sheet.
-- Publishing requires signing in with Google using an OAuth client ID.
+- Export results as JSON, YAML or Markdown and clear all stored data.
 - Results are persisted in browser local storage.
 - Browse OpenRouter models in a dedicated tab. The table shows the sum of
   prompt and completion pricing for each model.
