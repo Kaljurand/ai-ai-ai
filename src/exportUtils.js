@@ -26,6 +26,18 @@ export function rowsToMarkdown(rows, columns) {
   return header + '\n' + separator + '\n' + lines;
 }
 
+export function rowsToYAML(rows, columns) {
+  const fields = columns.filter(c => c.field !== 'actions');
+  return rows
+    .map(r =>
+      '-\n' +
+      fields
+        .map(f => `  ${f.field}: ${r[f.field] ?? ''}`)
+        .join('\n')
+    )
+    .join('\n');
+}
+
 export function download(content, type, filename) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);

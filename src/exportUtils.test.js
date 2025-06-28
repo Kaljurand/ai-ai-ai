@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rowsToCSV, rowsToMarkdown } from './exportUtils.js';
+import { rowsToYAML, rowsToMarkdown } from './exportUtils.js';
 
 const columns = [
   { field: 'a', headerName: 'A' },
@@ -11,9 +11,9 @@ const rows = [
 ];
 
 describe('export utils', () => {
-  it('converts rows to CSV', () => {
-    const csv = rowsToCSV(rows, columns).trim();
-    expect(csv).toBe('A,B\n"x","y"\n"1","2"');
+  it('converts rows to YAML', () => {
+    const yaml = rowsToYAML(rows, columns).trim();
+    expect(yaml).toBe('-\n  a: x\n  b: y\n-\n  a: 1\n  b: 2');
   });
   it('converts rows to Markdown', () => {
     const md = rowsToMarkdown(rows, columns).trim();
