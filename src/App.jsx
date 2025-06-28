@@ -79,10 +79,10 @@ function makeMockTranscription(text) {
   return out.join(' ');
 }
 
-function PersistedGrid({ storageKey, t, ...props }) {
+function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
   const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
   const [filterModel, setFilterModel] = useStoredState(storageKey + 'Filter', { items: [] });
-  const [cols, setCols] = useStoredState(storageKey + 'Cols', {});
+  const [cols, setCols] = useStoredState(storageKey + 'Cols', initialCols);
   const [previewRow, setPreviewRow] = useState(null);
   const open = Boolean(previewRow);
   const html = React.useMemo(() => {
@@ -186,6 +186,13 @@ function renderHtmlCell(params) {
   );
 }
 
+function renderProgressCell(params) {
+  if (params.row.pending && (params.value === undefined || params.value === '')) {
+    return <CircularProgress size={16} />;
+  }
+  return renderCell(params);
+}
+
 function ExportButtons({ rows, columns, name, t, children }) {
   return (
     <Box sx={{ mb: 1 }}>
@@ -266,7 +273,9 @@ const translations = {
     modelName: 'Name',
     modelDesc: 'Description',
     modality: 'Modality',
-    pricing: 'Pricing'
+    pricing: 'Pricing',
+    duration: 'Duration',
+    showOngoing: 'Show ongoing'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -336,7 +345,9 @@ const translations = {
     modelName: 'Nimi',
     modelDesc: 'Kirjeldus',
     modality: 'Modaliteet',
-    pricing: 'Hind'
+    pricing: 'Hind',
+    duration: 'Kestus',
+    showOngoing: 'Ainult k\u00e4iv'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -403,7 +414,9 @@ const translations = {
     modelName: 'Nimi',
     modelDesc: 'Kirjeldus',
     modality: 'Modaliteet',
-    pricing: 'Hind'
+    pricing: 'Hind',
+    duration: 'Kestus',
+    showOngoing: 'Ainult k\u00e4\u00fcmis'
   }
 };
 
@@ -453,6 +466,7 @@ export default function App({ darkMode, setDarkMode }) {
   const [loadingCount, setLoadingCount] = useState(0);
   const [errors, setErrors] = useState([]);
   const [logs, setLogs] = useStoredState('logs', []);
+  const [showOngoingOnly, setShowOngoingOnly] = useStoredState('logsOngoing', false);
 
   const predefinedPrompts = [
     'write an Estonian haiku in the style of Jaan Pehk',
@@ -520,22 +534,33 @@ export default function App({ darkMode, setDarkMode }) {
     setErrors(errs => [...errs, msg]);
   };
 
-  const addLog = (method, url, body = '', response = '', cost = '') => {
-    const truncate = v => {
-      if (typeof v === 'string') {
-        try { v = JSON.parse(v); } catch { return v.length > 50 ? v.slice(0, 25) + '...' + v.slice(-20) : v; }
+  const logIdRef = React.useRef(0);
+  const truncate = v => {
+    if (typeof v === 'string') {
+      try { v = JSON.parse(v); } catch { return v.length > 50 ? v.slice(0, 25) + '...' + v.slice(-20) : v; }
+    }
+    if (typeof v === 'object' && v) {
+      const out = {};
+      for (const [k, val] of Object.entries(v)) {
+        if (typeof val === 'string' && val.length > 50) out[k] = val.slice(0, 50) + '...';
+        else out[k] = val;
       }
-      if (typeof v === 'object' && v) {
-        const out = {};
-        for (const [k, val] of Object.entries(v)) {
-          if (typeof val === 'string' && val.length > 50) out[k] = val.slice(0, 50) + '...';
-          else out[k] = val;
-        }
-        return JSON.stringify(out);
-      }
-      return String(v);
-    };
-    setLogs(l => [...l, { time: new Date().toISOString(), method, url, body: truncate(body), response: truncate(response), cost }]);
+      return JSON.stringify(out);
+    }
+    return String(v);
+  };
+
+  const startLog = (method, url, body = '', model = '', cost = '') => {
+    const id = logIdRef.current++;
+    const entry = { id, time: new Date().toISOString(), method, url, body: truncate(body), model, cost, pending: true };
+    const start = Date.now();
+    setLogs(l => [...l, entry]);
+    return { id, start };
+  };
+
+  const finishLog = (handle, response = '', cost = '') => {
+    const duration = Date.now() - handle.start;
+    setLogs(l => l.map(e => e.id === handle.id ? { ...e, response: truncate(response), cost, duration, pending: false } : e));
   };
 
   const fetchWithLoading = async (url, opts) => {
@@ -594,9 +619,10 @@ export default function App({ darkMode, setDarkMode }) {
     (async () => {
       const url = 'https://openrouter.ai/api/v1/models';
       try {
+        const log = startLog('GET', url, '', 'openrouter');
         const res = await fetchWithLoading(url);
         const data = await res.json().catch(() => ({}));
-        addLog('GET', url, '', data);
+        finishLog(log, data);
         if (!res.ok) throw new Error(data.error?.message || data.detail || 'Failed to fetch OpenRouter models');
         const models = (data.data || []).map(m => ({ ...m, base: m.id.split('/').pop() }));
         if (models.length) {
@@ -626,9 +652,10 @@ export default function App({ darkMode, setDarkMode }) {
     (async () => {
       const url = 'https://api.openai.com/v1/models';
       try {
+        const log = startLog('GET', url, '', 'openai');
         const res = await fetchWithLoading(url, { headers: { 'Authorization': `Bearer ${apiKeys.openai}` } });
         const data = await res.json().catch(() => ({}));
-        addLog('GET', url, '', data);
+        finishLog(log, data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch OpenAI models');
         const models = data.data?.map(m => m.id).sort();
         if (models?.length) {
@@ -671,9 +698,10 @@ export default function App({ darkMode, setDarkMode }) {
     (async () => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`;
       try {
+        const log = startLog('GET', url, '', 'google');
         const res = await fetchWithLoading(url);
         const data = await res.json().catch(() => ({}));
-        addLog('GET', 'https://generativelanguage.googleapis.com/v1beta/models', '', data);
+        finishLog(log, data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google models');
         const models = data.models?.map(m => m.name);
         if (models?.length) {
@@ -701,9 +729,10 @@ export default function App({ darkMode, setDarkMode }) {
     (async () => {
       const url = `https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`;
       try {
+        const log = startLog('GET', url, '', 'google');
         const res = await fetchWithLoading(url);
         const data = await res.json().catch(() => ({}));
-        addLog('GET', 'https://texttospeech.googleapis.com/v1/voices', '', data);
+        finishLog(log, data);
         if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google voices');
         const voices = data.voices?.map(v => ({ id: v.name, name: v.name, cost: '', provider: 'google' }));
         if (voices?.length) {
@@ -731,27 +760,30 @@ export default function App({ darkMode, setDarkMode }) {
         const headers = { 'Content-Type': 'application/json' };
         if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
         const url = 'https://openrouter.ai/api/v1/chat/completions';
+        const log = startLog('POST', url, body, model);
         const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
-        addLog('POST', url, body, data);
+        finishLog(log, data);
         if (!res.ok) { showError(data.error?.message || 'Text generation failed'); continue; }
         const text = data.choices?.[0]?.message?.content?.trim();
         if (text) setTexts(t => [...t, { provider: model, text, prompt: textPrompt, timestamp }]);
       } else if (googleModels.includes(model)) {
         const body = { prompt: { text: textPrompt } };
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateText?key=${apiKeys.google}`;
+        const log = startLog('POST', url, body, model);
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
-        addLog('POST', url, body, data);
+        finishLog(log, data);
         if (!res.ok) { showError(data.error?.message || 'Text generation failed'); continue; }
         const text = data.candidates?.[0]?.output?.trim();
         if (text) setTexts(t => [...t, { provider: model, text, prompt: textPrompt, timestamp }]);
       } else {
         const body = { model, messages: [{ role: 'user', content: textPrompt }] };
         const url = 'https://api.openai.com/v1/chat/completions';
+        const log = startLog('POST', url, body, model);
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
-        addLog('POST', url, body, data);
+        finishLog(log, data);
         if (!res.ok) { showError(data.error?.message || 'Text generation failed'); continue; }
         const text = data.choices?.[0]?.message?.content?.trim();
         if (text) setTexts(t => [...t, { provider: model, text, prompt: textPrompt, timestamp }]);
@@ -804,11 +836,12 @@ export default function App({ darkMode, setDarkMode }) {
     for (const model of selectedTtsModels) {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
       if (mockMode) {
-        addLog('TTS', model, fullPrompt, '<audio>', cost);
+        const log = startLog('TTS', model, fullPrompt, model, cost);
         const blob = new Blob([fullPrompt], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
+        finishLog(log, '<audio>', cost);
       } else if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const url = 'https://openrouter.ai/api/v1/audio/speech';
@@ -821,15 +854,16 @@ export default function App({ darkMode, setDarkMode }) {
         };
         const headers = { 'Content-Type': 'application/json' };
         if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+        const log = startLog('POST', url, body, model, cost);
         const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          addLog('POST', url, body, err, cost);
+          finishLog(log, err, cost);
           showError(err.error?.message || 'TTS request failed');
           continue;
         }
         const blob = await res.blob();
-        addLog('POST', url, body, '<audio>', cost);
+        finishLog(log, '<audio>', cost);
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
@@ -842,6 +876,7 @@ export default function App({ darkMode, setDarkMode }) {
           voice: 'alloy',
           response_format: 'mp3'
         };
+        const log = startLog('POST', url, body, model, cost);
         const res = await fetchWithLoading(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
@@ -849,21 +884,22 @@ export default function App({ darkMode, setDarkMode }) {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          addLog('POST', url, body, err, cost);
+          finishLog(log, err, cost);
           showError(err.error?.message || 'TTS request failed');
           continue;
         }
         const blob = await res.blob();
-        addLog('POST', url, body, '<audio>', cost);
+        finishLog(log, '<audio>', cost);
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
       } else {
-        addLog('TTS', model, fullPrompt, '<audio>', cost);
+        const log = startLog('TTS', model, fullPrompt, model, cost);
         const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => [...a, { index: idx, provider: model, url: data, data, prompt: fullPrompt, timestamp, duration }]);
+        finishLog(log, '<audio>', cost);
       }
     }
   };
@@ -892,9 +928,10 @@ export default function App({ darkMode, setDarkMode }) {
           const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
           const headers = {};
           if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
+          const log = startLog('POST', url, '<audio>', model);
           const res = await fetchWithLoading(url, { method: 'POST', headers, body: form });
           const data = await res.json().catch(() => ({}));
-          addLog('POST', url, '<audio>', data);
+          finishLog(log, data);
           if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
           const text = data.text?.trim();
           if (text) finish(text, model);
@@ -908,9 +945,10 @@ export default function App({ darkMode, setDarkMode }) {
         if (asrPrompt) form.append('prompt', asrPrompt);
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
+          const log = startLog('POST', url, '<audio>', model);
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
           const data = await res.json().catch(() => ({}));
-          addLog('POST', url, '<audio>', data);
+          finishLog(log, data);
           if (!res.ok) throw new Error(data.error?.message || 'Transcription failed');
           const text = data.text?.trim();
           if (text) finish(text, model);
@@ -918,9 +956,10 @@ export default function App({ darkMode, setDarkMode }) {
           showError(e.message);
         }
       } else {
-        addLog('ASR', model, '<audio>');
+        const log = startLog('ASR', model, '<audio>', model);
         const text = texts[audio.index]?.text || '';
         finish(text, model);
+        finishLog(log, text);
       }
     }
     setStatus('');
@@ -990,9 +1029,10 @@ export default function App({ darkMode, setDarkMode }) {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (googleToken && !apiKeys.google) headers['Authorization'] = `Bearer ${googleToken}`;
+      const log = startLog('POST', url, row, 'google');
       const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
-      addLog('POST', url, row, data);
+      finishLog(log, data);
       if (!res.ok) throw new Error(data.error?.message || 'Publish failed');
     } catch (e) {
       showError(e.message);
@@ -1125,14 +1165,16 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const logRows = logs.map((l, i) => ({ id: i, ...l }));
+  const logRows = (showOngoingOnly ? logs.filter(l => l.pending) : logs).map((l, i) => ({ id: i, ...l }));
   const logColumns = [
+    { field: 'model', headerName: t('modelName'), width: 150, renderCell },
     { field: 'time', headerName: t('timestamp'), width: 180, renderCell },
     { field: 'method', headerName: t('actions'), width: 100, renderCell },
     { field: 'url', headerName: 'Endpoint', flex: 1, renderCell },
     { field: 'body', headerName: 'Body', flex: 1, renderCell },
-    { field: 'response', headerName: 'Response', flex: 1, renderCell },
-    { field: 'cost', headerName: 'Cost', width: 100, renderCell },
+    { field: 'response', headerName: 'Response', flex: 1, renderCell: params => renderProgressCell(params) },
+    { field: 'cost', headerName: 'Cost', width: 100, renderCell: renderProgressCell },
+    { field: 'duration', headerName: t('duration'), width: 100, renderCell: renderProgressCell },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 120,
       renderCell: params => (
@@ -1430,6 +1472,11 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'log' && (
         <div style={{ padding: '1rem' }}>
+          <FormControlLabel
+            control={<Switch checked={showOngoingOnly} disabled={!logs.some(l => l.pending)} onChange={e => setShowOngoingOnly(e.target.checked)} />}
+            label={t('showOngoing')}
+            sx={{ mb: 1 }}
+          />
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={logRows} columns={logColumns} name="logs" t={t} />
           <PersistedGrid
@@ -1437,6 +1484,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={logRows}
             columns={logColumns}
             t={t}
+            initialCols={{ duration: false }}
           />
         </div>
       )}

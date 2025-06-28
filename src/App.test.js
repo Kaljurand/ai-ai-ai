@@ -45,4 +45,12 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('showSelected')).toBe(true);
   });
+  it('includes duration translation', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('duration')).toBe(true);
+  });
+  it('includes showOngoing translation', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('showOngoing')).toBe(true);
+  });
 });
