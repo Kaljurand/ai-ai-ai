@@ -16,4 +16,15 @@ describe('transcriptsToRows', () => {
     expect(rows[0].asrSource).toBe('mock');
     expect(rows[1].wer).toBe('1.00');
   });
+
+  it('marks pending rows', () => {
+    const texts = [];
+    const audios = [];
+    const transcripts = [
+      { aIndex: 0, provider: 'mock', text: '', pending: true }
+    ];
+    const rows = transcriptsToRows(transcripts, audios, texts);
+    expect(rows[0].pending).toBe(true);
+    expect(rows[0].wer).toBe('');
+  });
 });

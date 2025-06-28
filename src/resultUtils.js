@@ -7,17 +7,22 @@ export function transcriptsToRows(transcripts, audios, texts) {
     const txt = audio ? texts[audio.index] : null;
     const orig = txt?.text || '';
     const transcription = t.text;
-    const wer = wordErrorRate(orig, transcription);
-    const diff = txt ? diffWordsHtml(orig, transcription) : transcription;
-    return {
+    const row = {
       i: i + 1,
       original: orig,
       transcription,
-      wer,
-      diff,
       textSource: txt?.provider || '',
       audioSource: audio?.provider || '',
-      asrSource: t.provider
+      asrSource: t.provider,
+      pending: t.pending || false
     };
+    if (!row.pending) {
+      row.wer = wordErrorRate(orig, transcription);
+      row.diff = txt ? diffWordsHtml(orig, transcription) : transcription;
+    } else {
+      row.wer = '';
+      row.diff = '';
+    }
+    return row;
   });
 }
