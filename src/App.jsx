@@ -151,8 +151,9 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
     }
     return marked.parse(String(val));
   }, [previewRow]);
-  const handleCellClick = params => {
+  const handleCellClick = (params, event) => {
     if (params.field === 'actions') return;
+    if (event.target.closest('input[type="checkbox"]')) return;
     setPreviewRow(params.row);
   };
   return (
@@ -1394,7 +1395,13 @@ export default function App({ darkMode, setDarkMode }) {
               )
             }}
           />
-          <Button size="small" onClick={generateTexts}>{t('genPrompt')}</Button>
+          <Tooltip
+            title={selectedTextModels.length
+              ? `${t('genPrompt')} (${selectedTextModels.join(', ')})`
+              : t('genPrompt')}
+          >
+            <Button size="small" onClick={generateTexts}>{t('genPrompt')}</Button>
+          </Tooltip>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={textRows} columns={textColumns} name="texts" t={t} />
           <PersistedGrid
@@ -1457,7 +1464,13 @@ export default function App({ darkMode, setDarkMode }) {
             margin="normal"
           />
           <Typography variant="subtitle2">{t('selectedModels')}: {selectedTtsModels.join(', ')}</Typography>
-          <Button size="small" variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
+          <Tooltip
+            title={selectedTtsModels.length
+              ? `${t('generateAudio')} (${selectedTtsModels.join(', ')})`
+              : t('generateAudio')}
+          >
+            <Button size="small" variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
+          </Tooltip>
           <Button size="small" component="label" sx={{ mt: 1, ml: 1 }}>
             {t('uploadAudio')}
             <input type="file" accept="audio/*" hidden onChange={e => uploadAudio(e.target.files[0])} />
