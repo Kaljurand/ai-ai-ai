@@ -33,11 +33,21 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
+import Draggable from 'react-draggable';
+import Paper from '@mui/material/Paper';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
 import { marked } from 'marked';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+
+function PaperComponent(props) {
+  return (
+    <Draggable cancel={'[class*="MuiDialogContent-root"]'} handle="#draggable-dialog-title">
+      <Paper {...props} />
+    </Draggable>
+  );
+}
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -85,6 +95,32 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
   const [cols, setCols] = useStoredState(storageKey + 'Cols', initialCols);
   const [previewRow, setPreviewRow] = useState(null);
   const open = Boolean(previewRow);
+  const renderFields = row =>
+    props.columns
+      .filter(c => c.field !== 'actions' && row[c.field] != null && c.field !== 'url')
+      .map(c => {
+        const val = String(row[c.field]);
+        return (
+          <TextField
+            key={c.field}
+            label={c.headerName || c.field}
+            value={val}
+            multiline
+            fullWidth
+            margin="dense"
+            InputProps={{
+              readOnly: true,
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(val)}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+        );
+      });
   const html = React.useMemo(() => {
     if (!previewRow) return '';
     const val =
@@ -107,7 +143,8 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
     }
     return marked.parse(String(val));
   }, [previewRow]);
-  const handleRowClick = params => {
+  const handleCellClick = params => {
+    if (params.field === 'actions') return;
     setPreviewRow(params.row);
   };
   return (
@@ -124,20 +161,23 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
         onFilterModelChange={setFilterModel}
         columnVisibilityModel={cols}
         onColumnVisibilityModelChange={setCols}
-        onRowClick={handleRowClick}
+        onCellClick={handleCellClick}
         {...props}
       />
-      <Dialog open={open} onClose={() => setPreviewRow(null)} fullWidth maxWidth="sm">
+      <Dialog open={open} onClose={() => setPreviewRow(null)} PaperComponent={PaperComponent} fullWidth maxWidth="sm">
         {previewRow && (
           <>
-            <DialogTitle>
-              {`#${previewRow.id ?? previewRow.i ?? ''} ${previewRow.timestamp || previewRow.time || ''} ${previewRow.provider || previewRow.asrSource || previewRow.audioSource || previewRow.textSource || ''}`}
+            <DialogTitle style={{ cursor: 'move' }} id="draggable-dialog-title">
+              {`#${previewRow.id ?? previewRow.i ?? previewRow.index ?? ''} ${previewRow.timestamp || previewRow.time || ''} ${previewRow.provider || previewRow.asrSource || previewRow.audioSource || previewRow.textSource || ''}`}
+              <IconButton size="small" onClick={() => setPreviewRow(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </DialogTitle>
             <DialogContent dividers>
-              {previewRow.url && (
+              {previewRow.url && (['audios','results'].includes(storageKey)) && (
                 <audio controls src={previewRow.url} style={{ width: '100%', marginBottom: '1em' }} />
               )}
-              <div dangerouslySetInnerHTML={{ __html: html }} />
+              {renderFields(previewRow)}
             </DialogContent>
             <DialogActions>
               <Button size="small" onClick={() => navigator.clipboard.writeText(typeof previewRow === 'object' ? JSON.stringify(previewRow, null, 2) : '')}>{t('copy')}</Button>
@@ -1109,12 +1149,12 @@ export default function App({ darkMode, setDarkMode }) {
       renderCell: params => (
         <>
           <Tooltip title={t('useText')}>
-            <IconButton onClick={() => { setSelectedTextId(params.row.id); setTtsPrompt(params.row.text); setView('audio'); }} size="small">
+            <IconButton onClick={e => { e.stopPropagation(); setSelectedTextId(params.row.id); setTtsPrompt(params.row.text); setView('audio'); }} size="small">
               <ArrowForwardIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title={t('delete')}>
-            <IconButton onClick={() => deleteText(params.row.id)} size="small" color="error">
+            <IconButton onClick={e => { e.stopPropagation(); deleteText(params.row.id); }} size="small" color="error">
               <DeleteIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -1149,12 +1189,12 @@ export default function App({ darkMode, setDarkMode }) {
       renderCell: params => (
         <>
           <Tooltip title={t('toAsr')}>
-            <IconButton onClick={() => transcribe(params.row._index)} size="small">
+            <IconButton onClick={e => { e.stopPropagation(); transcribe(params.row._index); }} size="small">
               <ArrowForwardIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title={t('delete')}>
-            <IconButton onClick={() => deleteAudio(params.row._index)} size="small" color="error">
+            <IconButton onClick={e => { e.stopPropagation(); deleteAudio(params.row._index); }} size="small" color="error">
               <DeleteIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -1178,12 +1218,12 @@ export default function App({ darkMode, setDarkMode }) {
       renderCell: params => (
         <>
           <Tooltip title={t('publish')}>
-            <IconButton onClick={() => publishTranscript(params.row._index)} size="small">
+            <IconButton onClick={e => { e.stopPropagation(); publishTranscript(params.row._index); }} size="small">
               <CloudUploadIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title={t('delete')}>
-            <IconButton onClick={() => deleteTranscript(params.row._index)} size="small" color="error">
+            <IconButton onClick={e => { e.stopPropagation(); deleteTranscript(params.row._index); }} size="small" color="error">
               <DeleteIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -1206,7 +1246,7 @@ export default function App({ darkMode, setDarkMode }) {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 120,
       renderCell: params => (
         <Tooltip title={t('delete')}>
-          <IconButton onClick={() => deleteLog(params.row.id)} size="small" color="error">
+          <IconButton onClick={e => { e.stopPropagation(); deleteLog(params.row.id); }} size="small" color="error">
             <DeleteIcon fontSize="small" />
           </IconButton>
         </Tooltip>

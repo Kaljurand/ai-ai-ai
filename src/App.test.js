@@ -57,4 +57,13 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('pending: !mockMode')).toBe(true);
   });
+  it('uses draggable dialog and cell click handler', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('react-draggable')).toBe(true);
+    expect(code.includes('onCellClick')).toBe(true);
+  });
+  it('stops row click propagation on action buttons', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('stopPropagation')).toBe(true);
+  });
 });
