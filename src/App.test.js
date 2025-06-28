@@ -31,7 +31,7 @@ describe('App.jsx compilation', () => {
   });
   it('uses the instructions field in TTS requests', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(/instructions:\s*ttsMetaPrompt/.test(code)).toBe(true);
+    expect(code.includes('expandRefs(ttsMetaPrompt')).toBe(true);
   });
   it('imports the more icon', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
