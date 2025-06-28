@@ -302,8 +302,10 @@ const translations = {
     exportMD: 'Export Markdown',
     clearData: 'Clear Data',
     clearKeys: 'Clear Keys',
+    resetUi: 'Reset UI state',
     keysGroup: 'Keys',
     uiGroup: 'UI',
+    storageGroup: 'Storage',
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
     openrouterKey: 'OpenRouter API key',
@@ -371,8 +373,10 @@ const translations = {
     exportMD: 'Ekspordi Markdown',
     clearData: 'Puhasta andmed',
     clearKeys: 'Puhasta võtmid',
+    resetUi: 'Taasta liidese olek',
     keysGroup: 'Võtmed',
     uiGroup: 'Kasutajaliides',
+    storageGroup: 'Salvestus',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
@@ -439,6 +443,8 @@ const translations = {
     exportCSV: 'Ekspordi CSV',
     exportMD: 'Ekspordi Markdown',
     clearData: 'Puhasta andmed',
+    clearKeys: 'Puhasta võtmid',
+    resetUi: 'Taasta liidese olõk',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
@@ -453,6 +459,7 @@ const translations = {
     preview: 'Eelvaot\u00f5',
     showSelected: 'Ainult valitud',
     selectedModels: 'Mudelid',
+    storageGroup: 'Salvestus',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
     pricePerM: 'USD 1M tokeni p\u00e4\u00e4le',
@@ -1133,6 +1140,20 @@ export default function App({ darkMode, setDarkMode }) {
     setApiKeys({ openai: '', google: '', openrouter: '' });
   };
 
+  const resetUi = () => {
+    const keys = [
+      'textPrompt', 'ttsPrompt', 'asrPrompt', 'ttsMetaPrompt',
+      'textsSort', 'textsFilter', 'textsCols',
+      'audiosSort', 'audiosFilter', 'audiosCols',
+      'resultsSort', 'resultsFilter', 'resultsCols',
+      'modelsSort', 'modelsFilter', 'modelsCols',
+      'logsSort', 'logsFilter', 'logsCols',
+      'darkMode', 'lang'
+    ];
+    keys.forEach(k => localStorage.removeItem(k));
+    window.location.reload();
+  };
+
   const rows = transcriptsToRows(transcripts, audios, texts);
 
   const textRows = texts.map((txt, i) => ({ id: i, ...txt })).filter(r => r.provider !== 'tts');
@@ -1605,9 +1626,11 @@ export default function App({ darkMode, setDarkMode }) {
             <MenuItem value="vro">V\u00f5ro</MenuItem>
           </Select>
           {mockMode && <Typography color="error">{t('mockMode')}</Typography>}
-          <Box sx={{ mt: 2 }}>
+          <Divider textAlign="left" sx={{ my: 2 }}>{t('storageGroup')}</Divider>
+          <Box>
             <Button size="small" onClick={clearTables}>{t('clearData')}</Button>
             <Button size="small" onClick={clearKeys} sx={{ ml: 1 }}>{t('clearKeys')}</Button>
+            <Button size="small" onClick={resetUi} sx={{ ml: 1 }}>{t('resetUi')}</Button>
           </Box>
         </div>
       )}
