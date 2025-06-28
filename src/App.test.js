@@ -71,4 +71,13 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('exportYAML')).toBe(true);
   });
+  it('shows generate tooltips with models', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(/Tooltip\s*\n\s*title={selectedTextModels.length/.test(code)).toBe(true);
+    expect(/Tooltip\s*\n\s*title={selectedTtsModels.length/.test(code)).toBe(true);
+  });
+  it('ignores checkbox clicks', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes("closest('input[type=\"checkbox\"]')")).toBe(true);
+  });
 });
