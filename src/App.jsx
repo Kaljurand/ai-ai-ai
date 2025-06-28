@@ -3,7 +3,6 @@ import PlaygroundIcon from './PlaygroundIcon';
 import { wordErrorRate } from './wordErrorRate';
 import { diffWordsHtml } from './diffWords';
 import { transcriptsToRows } from './resultUtils';
-import { parseSheetId } from './googleSheet';
 import {
   Button,
   IconButton,
@@ -32,7 +31,6 @@ import {
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
 import Draggable from 'react-draggable';
 import Paper from '@mui/material/Paper';
@@ -345,11 +343,6 @@ const translations = {
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
     openrouterKey: 'OpenRouter API key',
-    sheetUrl: 'Google Sheet URL',
-    publish: 'Publish',
-    googleClientId: 'Google Client ID',
-    signIn: 'Sign in with Google',
-    signOut: 'Sign out',
     language: 'Language',
     darkMode: 'Dark mode',
     mockMode: 'Mock mode active: no API key',
@@ -417,11 +410,6 @@ const translations = {
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
-    sheetUrl: 'Google Sheeti URL',
-    publish: 'Avalda',
-    googleClientId: 'Google kliendi ID',
-    signIn: 'Logi Google\u2019i',
-    signOut: 'Logi v\u00e4lja',
     language: 'Keel',
     darkMode: 'Tume re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
@@ -486,11 +474,6 @@ const translations = {
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
-    sheetUrl: 'Google Sheeti URL',
-    publish: 'Avalda',
-    googleClientId: 'Google kliendi ID',
-    signIn: 'Logi Google\u2019i',
-    signOut: 'Logi v\u00e4lja',
     language: 'Kiil',
     darkMode: 'Tummas re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
@@ -518,9 +501,6 @@ function useTranslation() {
 
 export default function App({ darkMode, setDarkMode }) {
   const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '', openrouter: '' });
-  const [sheetUrl, setSheetUrl] = useStoredState('sheetUrl', '');
-  const [googleClientId, setGoogleClientId] = useStoredState('googleClientId', '');
-  const [googleToken, setGoogleToken] = useStoredState('googleToken', '');
   const { t, lang, setLang } = useTranslation();
   const [texts, setTexts] = useStoredState('texts', []);
   const [audios, setAudios] = useStoredState('audios', []);
@@ -684,25 +664,6 @@ export default function App({ darkMode, setDarkMode }) {
   });
 
   const mockMode = !apiKeys.openai && !apiKeys.google && !apiKeys.openrouter;
-
-  const signInGoogle = () => {
-    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
-      showError('Google API not available');
-      return;
-    }
-    if (!googleClientId) {
-      showError('Missing Google Client ID');
-      return;
-    }
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: googleClientId,
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      callback: token => setGoogleToken(token.access_token)
-    });
-    client.requestAccessToken({ prompt: '' });
-  };
-
-  const signOutGoogle = () => setGoogleToken('');
 
   useEffect(() => {
     (async () => {
@@ -1106,44 +1067,6 @@ export default function App({ darkMode, setDarkMode }) {
     setTranscripts(t => t.filter((_, i) => i !== tIndex));
   };
 
-  const publishTranscript = async (tIndex) => {
-    const tr = transcripts[tIndex];
-    if (!tr) return;
-    if (!sheetUrl || (!apiKeys.google && !googleToken)) {
-      showError('Missing Google Sheet URL or auth');
-      return;
-    }
-    const sheetId = parseSheetId(sheetUrl);
-    if (!sheetId) {
-      showError('Invalid Google Sheet URL');
-      return;
-    }
-    const audio = audios[tr.aIndex];
-    const txt = audio ? texts[audio.index] : null;
-    const row = [
-      tr.timestamp || audio?.timestamp || new Date().toISOString(),
-      tr.provider,
-      audio?.provider || '',
-      txt?.provider || '',
-      txt?.text || '',
-      tr.text,
-      txt ? wordErrorRate(txt.text, tr.text) : 1
-    ];
-    const keyParam = apiKeys.google ? `?valueInputOption=USER_ENTERED&key=${apiKeys.google}` : '?valueInputOption=USER_ENTERED';
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append${keyParam}`;
-    const body = { values: [row] };
-    try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (googleToken && !apiKeys.google) headers['Authorization'] = `Bearer ${googleToken}`;
-      const log = startLog('POST', url, row, 'google');
-      const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
-      const data = await res.json().catch(() => ({}));
-      finishLog(log, data);
-      if (!res.ok) throw new Error(data.error?.message || 'Publish failed');
-    } catch (e) {
-      showError(e.message);
-    }
-  };
 
   const deleteLog = (lIndex) => {
     setLogs(l => l.filter((_, i) => i !== lIndex));
@@ -1270,20 +1193,13 @@ export default function App({ darkMode, setDarkMode }) {
     { field: 'wer', headerName: t('wer'), width: 90, renderCell: renderProgressCell },
     { field: 'diff', headerName: t('diff'), flex: 1, renderCell: renderHtmlProgressCell },
     {
-      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 150,
+      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 90,
       renderCell: params => (
-        <>
-          <Tooltip title={t('publish')}>
-            <IconButton onClick={e => { e.stopPropagation(); publishTranscript(params.row._index); }} size="small">
-              <CloudUploadIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={t('delete')}>
-            <IconButton onClick={e => { e.stopPropagation(); deleteTranscript(params.row._index); }} size="small" color="error">
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </>
+        <Tooltip title={t('delete')}>
+          <IconButton onClick={e => { e.stopPropagation(); deleteTranscript(params.row._index); }} size="small" color="error">
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       )
     }
   ];
@@ -1595,9 +1511,7 @@ export default function App({ darkMode, setDarkMode }) {
             }}
           />
           <Divider sx={{ my: 2 }} />
-          <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t}>
-            <Button size="small" onClick={clearTables} sx={{ ml: 1 }}>{t('clearData')}</Button>
-          </ExportButtons>
+          <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t} />
           <PersistedGrid
             storageKey="results"
             rows={resultRows}
@@ -1663,25 +1577,6 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             margin="normal"
           />
-          <TextField
-            label={t('sheetUrl')}
-            value={sheetUrl}
-            onChange={e => setSheetUrl(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label={t('googleClientId')}
-            value={googleClientId}
-            onChange={e => setGoogleClientId(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          {googleToken ? (
-            <Button size="small" onClick={signOutGoogle} sx={{ mt: 1 }}>{t('signOut')}</Button>
-          ) : (
-            <Button size="small" onClick={signInGoogle} sx={{ mt: 1 }}>{t('signIn')}</Button>
-          )}
           <Divider textAlign="left" sx={{ my: 2 }}>{t('uiGroup')}</Divider>
           <FormControlLabel
             control={<Switch checked={darkMode} onChange={e => setDarkMode(e.target.checked)} />}
