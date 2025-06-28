@@ -33,9 +33,9 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(/instructions:\s*ttsMetaPrompt/.test(code)).toBe(true);
   });
-  it('imports the visibility icon', () => {
+  it('imports the more icon', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(code.includes('@mui/icons-material/Visibility')).toBe(true);
+    expect(code.includes('@mui/icons-material/MoreVert')).toBe(true);
   });
   it('includes showSelected translation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');

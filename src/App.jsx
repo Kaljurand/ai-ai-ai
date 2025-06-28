@@ -28,6 +28,7 @@ import {
   DialogActions,
   InputAdornment,
   FormGroup,
+  Menu,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -38,8 +39,10 @@ import Paper from '@mui/material/Paper';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
 import { marked } from 'marked';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 function PaperComponent(props) {
   return (
@@ -109,9 +112,10 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
     if (s.trim().startsWith('<') && s.includes('</')) return s;
     return marked.parse(s);
   };
+  const exclude = ['id','i','index','timestamp','time','provider','textSource','audioSource','asrSource','model','modelId','name'];
   const renderFields = row =>
     props.columns
-      .filter(c => c.field !== 'actions' && row[c.field] != null)
+      .filter(c => c.field !== 'actions' && !exclude.includes(c.field) && row[c.field] != null)
       .map(c => {
         const raw = row[c.field];
         const html = renderValue(raw);
@@ -174,7 +178,16 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
         {previewRow && (
           <>
             <DialogTitle style={{ cursor: 'move' }} id="draggable-dialog-title">
-              {`#${previewRow.id ?? previewRow.i ?? previewRow.index ?? ''} ${previewRow.timestamp || previewRow.time || ''} ${previewRow.provider || previewRow.asrSource || previewRow.audioSource || previewRow.textSource || ''}`}
+              {(() => {
+                const parts = [];
+                const id = previewRow.id ?? previewRow.i ?? previewRow.index;
+                if (id != null) parts.push('#' + id);
+                if (previewRow.timestamp || previewRow.time) parts.push(previewRow.timestamp || previewRow.time);
+                if (previewRow.model || previewRow.name || previewRow.modelId) parts.push(previewRow.model || previewRow.name || previewRow.modelId);
+                const provider = previewRow.provider || previewRow.asrSource || previewRow.audioSource || previewRow.textSource;
+                if (provider) parts.push(provider);
+                return parts.join(' ');
+              })()}
               <IconButton size="small" onClick={() => setPreviewRow(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
                 <CloseIcon fontSize="small" />
               </IconButton>
@@ -214,12 +227,7 @@ function renderCell(params) {
   }
   return (
     <Tooltip title={val} placement="top">
-      <span style={style}>
-        {val}
-        {typeof params.value === 'string' && params.value && (
-          <VisibilityIcon sx={{ ml: 0.5, fontSize: '1em', verticalAlign: 'middle', color: 'action.disabled' }} />
-        )}
-      </span>
+      <span style={style}>{val}</span>
     </Tooltip>
   );
 }
@@ -1350,6 +1358,20 @@ export default function App({ darkMode, setDarkMode }) {
       ) }
   ];
 
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const tabsAll = [
+    { value: 'text', label: t('tabText') },
+    { value: 'audio', label: t('tabAudio') },
+    { value: 'asr', label: t('tabAsr') },
+    { value: 'log', label: t('tabLog') },
+    { value: 'models', label: t('tabModels') },
+    { value: 'config', label: t('tabSettings') }
+  ];
+  const visibleTabs = isSmall ? tabsAll.slice(0, 3) : tabsAll;
+  const extraTabs = isSmall ? tabsAll.slice(3) : [];
+
 
   return (
     <>
@@ -1362,16 +1384,25 @@ export default function App({ darkMode, setDarkMode }) {
             onChange={(e, v) => setView(v)}
             textColor="inherit"
             indicatorColor="secondary"
-            variant="scrollable"
-            scrollButtons="auto"
           >
-            <Tab value="text" label={t('tabText')} />
-            <Tab value="audio" label={t('tabAudio')} />
-            <Tab value="asr" label={t('tabAsr')} />
-            <Tab value="log" label={t('tabLog')} />
-            <Tab value="models" label={t('tabModels')} />
-            <Tab value="config" label={t('tabSettings')} />
+            {visibleTabs.map(ti => (
+              <Tab key={ti.value} value={ti.value} label={ti.label} />
+            ))}
           </Tabs>
+          {extraTabs.length > 0 && (
+            <>
+              <IconButton color="inherit" onClick={e => setMenuAnchor(e.currentTarget)}>
+                <MoreVertIcon />
+              </IconButton>
+              <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
+                {extraTabs.map(ti => (
+                  <MenuItem key={ti.value} onClick={() => { setView(ti.value); setMenuAnchor(null); }}>
+                    {ti.label}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </>
+          )}
           {loadingCount > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
               <CircularProgress size={20} color="inherit" />
