@@ -36,6 +36,7 @@ import Draggable from 'react-draggable';
 import Paper from '@mui/material/Paper';
 import { DataGrid } from '@mui/x-data-grid';
 import { rowsToJSON, rowsToYAML, rowsToMarkdown, download } from './exportUtils';
+import { expandRefs } from './referenceUtils';
 import { marked } from 'marked';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -111,16 +112,32 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
     return marked.parse(s);
   };
   const exclude = ['id','i','index','timestamp','time','provider','textSource','audioSource','asrSource','model','modelId','name'];
+  const tabKey = {
+    texts: 'tab_text',
+    audios: 'tab_audio',
+    results: 'tab_asr',
+    models: 'tab_models',
+    logs: 'tab_log'
+  }[storageKey] || storageKey;
   const renderFields = row =>
     props.columns
       .filter(c => c.field !== 'actions' && !exclude.includes(c.field) && row[c.field] != null)
       .map(c => {
         const raw = row[c.field];
         const html = renderValue(raw);
+        const id = row.id != null ? row.id + 1 : (row.i ?? row.index ?? '');
+        const ref = id !== '' ? `{{${tabKey}.table.${id}.${c.field}}}` : '';
         return (
           <Box key={c.field} sx={{ mb: 1 }}>
             <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center' }}>
               {c.headerName || c.field}
+              {ref && (
+                <Tooltip title={ref} placement="top">
+                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(ref)}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
               <IconButton size="small" onClick={() => navigator.clipboard.writeText(typeof raw === 'object' ? JSON.stringify(raw, null, 2) : String(raw))}>
                 <ContentCopyIcon fontSize="small" />
               </IconButton>
@@ -209,7 +226,7 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
   );
 }
 
-function renderCell(params) {
+function renderCell(params, tab) {
   let val = params.value == null ? '' : String(params.value);
   if (/^\d{4}-\d{2}-\d{2}T/.test(val)) {
     val = val.replace('T', ' ').slice(0, 19);
@@ -224,34 +241,40 @@ function renderCell(params) {
   if (['timestamp', 'time', 'provider', 'textSource', 'audioSource', 'asrSource', 'wer'].includes(params.field)) {
     style.fontFamily = 'monospace';
   }
+  const id = params.row.id != null ? params.row.id + 1 : (params.row.i ?? params.row.index ?? '');
+  const ref = tab && id !== '' ? `{{${tab}.table.${id}.${params.field}}}` : '';
+  const title = ref ? `${val} ${ref}` : val;
   return (
-    <Tooltip title={val} placement="top">
+    <Tooltip title={title} placement="top">
       <span style={style}>{val}</span>
     </Tooltip>
   );
 }
 
-function renderHtmlCell(params) {
+function renderHtmlCell(params, tab) {
   const text = (params.value || '').replace(/<[^>]+>/g, '');
+  const id = params.row.id != null ? params.row.id + 1 : (params.row.i ?? params.row.index ?? '');
+  const ref = tab && id !== '' ? `{{${tab}.table.${id}.${params.field}}}` : '';
+  const title = ref ? `${text} ${ref}` : text;
   return (
-    <Tooltip title={text} placement="top">
+    <Tooltip title={title} placement="top">
       <span style={{ whiteSpace: 'normal', wordWrap: 'break-word' }} dangerouslySetInnerHTML={{ __html: params.value }} />
     </Tooltip>
   );
 }
 
-function renderProgressCell(params) {
+function renderProgressCell(params, tab) {
   if (params.row.pending && (params.value === undefined || params.value === '')) {
     return <CircularProgress size={16} />;
   }
-  return renderCell(params);
+  return renderCell(params, tab);
 }
 
-function renderHtmlProgressCell(params) {
+function renderHtmlProgressCell(params, tab) {
   if (params.row.pending && !params.value) {
     return <CircularProgress size={16} />;
   }
-  return renderHtmlCell(params);
+  return renderHtmlCell(params, tab);
 }
 
 function ExportButtons({ rows, columns, name, t, children }) {
@@ -812,7 +835,7 @@ export default function App({ darkMode, setDarkMode }) {
       }
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
-        const body = { model: orModel, messages: [{ role: 'user', content: textPrompt }] };
+        const body = { model: orModel, messages: [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }] };
         const headers = { 'Content-Type': 'application/json' };
         if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
         const url = 'https://openrouter.ai/api/v1/chat/completions';
@@ -824,7 +847,7 @@ export default function App({ darkMode, setDarkMode }) {
         const text = data.choices?.[0]?.message?.content?.trim();
         if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       } else if (googleModels.includes(model)) {
-        const body = { prompt: { text: textPrompt } };
+        const body = { prompt: { text: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) } };
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateText?key=${apiKeys.google}`;
         const log = startLog('POST', url, body, model);
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -834,7 +857,7 @@ export default function App({ darkMode, setDarkMode }) {
         const text = data.candidates?.[0]?.output?.trim();
         if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       } else {
-        const body = { model, messages: [{ role: 'user', content: textPrompt }] };
+        const body = { model, messages: [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }] };
         const url = 'https://api.openai.com/v1/chat/completions';
         const log = startLog('POST', url, body, model);
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
@@ -908,8 +931,8 @@ export default function App({ darkMode, setDarkMode }) {
         const url = 'https://openrouter.ai/api/v1/audio/speech';
         const body = {
           model: orModel,
-          input: ttsPrompt,
-          instructions: ttsMetaPrompt,
+          input: expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt }),
+          instructions: expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt }),
           voice: 'alloy',
           response_format: 'mp3'
         };
@@ -933,8 +956,8 @@ export default function App({ darkMode, setDarkMode }) {
         const url = 'https://api.openai.com/v1/audio/speech';
         const body = {
           model,
-          input: ttsPrompt,
-          instructions: ttsMetaPrompt,
+          input: expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt }),
+          instructions: expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt }),
           voice: 'alloy',
           response_format: 'mp3'
         };
@@ -991,7 +1014,7 @@ export default function App({ darkMode, setDarkMode }) {
         const form = new FormData();
         form.append('model', orModel);
         form.append('file', blob, 'audio.webm');
-        if (asrPrompt) form.append('prompt', asrPrompt);
+        if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
           const headers = {};
@@ -1010,7 +1033,7 @@ export default function App({ darkMode, setDarkMode }) {
         const form = new FormData();
         form.append('model', model);
         form.append('file', blob, 'audio.webm');
-        if (asrPrompt) form.append('prompt', asrPrompt);
+        if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
           const log = startLog('POST', url, '<audio>', model);
@@ -1120,10 +1143,10 @@ export default function App({ darkMode, setDarkMode }) {
 
   const textRows = texts.map((txt, i) => ({ id: i, ...txt })).filter(r => r.provider !== 'tts');
   const textColumns = [
-    { field: 'id', headerName: t('textId'), width: 70, valueGetter: p => (p.row && p.row.id != null ? p.row.id + 1 : '') , renderCell },
-    { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell },
-    { field: 'text', headerName: t('text'), flex: 1, renderCell: renderProgressCell },
-    { field: 'provider', headerName: t('source'), width: 120, renderCell },
+    { field: 'id', headerName: t('textId'), width: 70, valueGetter: p => (p.row && p.row.id != null ? p.row.id + 1 : ''), renderCell: p => renderCell(p, 'tab_text') },
+    { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_text') },
+    { field: 'text', headerName: t('text'), flex: 1, renderCell: p => renderProgressCell(p, 'tab_text') },
+    { field: 'provider', headerName: t('source'), width: 120, renderCell: p => renderCell(p, 'tab_text') },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 150,
       renderCell: params => (
@@ -1153,15 +1176,15 @@ export default function App({ darkMode, setDarkMode }) {
     )
   );
   const audioColumns = [
-    { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell },
-    { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell },
-    { field: 'provider', headerName: t('source'), width: 120, renderCell },
+    { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_audio') },
+    { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell: p => renderCell(p, 'tab_audio') },
+    { field: 'provider', headerName: t('source'), width: 120, renderCell: p => renderCell(p, 'tab_audio') },
     {
       field: 'text',
       headerName: t('text'),
       flex: 1,
       valueGetter: p => (p && p.row && p.row.index != null ? (texts[p.row.index]?.text || '') : ''),
-      renderCell
+      renderCell: p => renderCell(p, 'tab_audio')
     },
     { field: 'audio', headerName: t('audio'), flex: 1, sortComparator: (a,b,c,d) => (c?.row?.duration ?? 0) - (d?.row?.duration ?? 0), renderCell: renderAudioCell },
     {
@@ -1185,14 +1208,14 @@ export default function App({ darkMode, setDarkMode }) {
 
   const resultRows = rows.map((r, idx) => ({ id: idx, ...r, _index: idx }));
   const resultColumns = [
-    { field: 'i', headerName: t('transcriptId'), width: 70, renderCell },
-    { field: 'textSource', headerName: t('textSource'), width: 120, renderCell },
-    { field: 'audioSource', headerName: t('audioSource'), width: 120, renderCell },
-    { field: 'asrSource', headerName: t('asrSource'), width: 120, renderCell },
-    { field: 'original', headerName: t('originalText'), flex: 1, renderCell },
-    { field: 'transcription', headerName: t('transcript'), flex: 1, renderCell: renderProgressCell },
-    { field: 'wer', headerName: t('wer'), width: 90, renderCell: renderProgressCell },
-    { field: 'diff', headerName: t('diff'), flex: 1, renderCell: renderHtmlProgressCell },
+    { field: 'i', headerName: t('transcriptId'), width: 70, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'textSource', headerName: t('textSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'audioSource', headerName: t('audioSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'asrSource', headerName: t('asrSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'original', headerName: t('originalText'), flex: 1, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'transcription', headerName: t('transcript'), flex: 1, renderCell: p => renderProgressCell(p, 'tab_asr') },
+    { field: 'wer', headerName: t('wer'), width: 90, renderCell: p => renderProgressCell(p, 'tab_asr') },
+    { field: 'diff', headerName: t('diff'), flex: 1, renderCell: p => renderHtmlProgressCell(p, 'tab_asr') },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 90,
       renderCell: params => (
@@ -1207,14 +1230,14 @@ export default function App({ darkMode, setDarkMode }) {
 
   const logRows = logs.map((l, i) => ({ id: i, ...l }));
   const logColumns = [
-    { field: 'model', headerName: t('modelName'), width: 150, renderCell },
-    { field: 'time', headerName: t('timestamp'), width: 180, renderCell },
-    { field: 'method', headerName: t('actions'), width: 100, renderCell },
-    { field: 'url', headerName: 'Endpoint', flex: 1, renderCell },
-    { field: 'body', headerName: 'Body', flex: 1, renderCell },
-    { field: 'response', headerName: 'Response', flex: 1, renderCell: params => renderProgressCell(params) },
-    { field: 'cost', headerName: 'Cost', width: 100, renderCell: renderProgressCell },
-    { field: 'duration', headerName: t('duration'), width: 100, renderCell: renderProgressCell },
+    { field: 'model', headerName: t('modelName'), width: 150, renderCell: p => renderCell(p, 'tab_log') },
+    { field: 'time', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_log') },
+    { field: 'method', headerName: t('actions'), width: 100, renderCell: p => renderCell(p, 'tab_log') },
+    { field: 'url', headerName: 'Endpoint', flex: 1, renderCell: p => renderCell(p, 'tab_log') },
+    { field: 'body', headerName: 'Body', flex: 1, renderCell: p => renderCell(p, 'tab_log') },
+    { field: 'response', headerName: 'Response', flex: 1, renderCell: p => renderProgressCell(p, 'tab_log') },
+    { field: 'cost', headerName: 'Cost', width: 100, renderCell: p => renderProgressCell(p, 'tab_log') },
+    { field: 'duration', headerName: t('duration'), width: 100, renderCell: p => renderProgressCell(p, 'tab_log') },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 120,
       renderCell: params => (
@@ -1276,12 +1299,12 @@ export default function App({ darkMode, setDarkMode }) {
   );
 
   const modelColumns = [
-    { field: 'id', headerName: t('modelId'), width: 200, renderCell },
-    { field: 'provider', headerName: t('source'), width: 100, renderCell },
-    { field: 'name', headerName: t('modelName'), width: 200, renderCell },
-    { field: 'description', headerName: t('modelDesc'), flex: 1, renderCell },
-    { field: 'modality', headerName: t('modality'), width: 120, renderCell },
-    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell },
+    { field: 'id', headerName: t('modelId'), width: 200, renderCell: p => renderCell(p, 'tab_models') },
+    { field: 'provider', headerName: t('source'), width: 100, renderCell: p => renderCell(p, 'tab_models') },
+    { field: 'name', headerName: t('modelName'), width: 200, renderCell: p => renderCell(p, 'tab_models') },
+    { field: 'description', headerName: t('modelDesc'), flex: 1, renderCell: p => renderCell(p, 'tab_models') },
+    { field: 'modality', headerName: t('modality'), width: 120, renderCell: p => renderCell(p, 'tab_models') },
+    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell: p => renderCell(p, 'tab_models') },
     { field: 'text', headerName: t('tabText'), width: 80, sortable: false, filterable: false,
       renderCell: params => (
         <Checkbox size="small" checked={selectedTextModels.includes(params.row.id)} onChange={e => {
@@ -1377,24 +1400,26 @@ export default function App({ darkMode, setDarkMode }) {
             ))}
             <MenuItem value=""></MenuItem>
           </Select>
-          <TextField
-            label={t('promptForModels')}
-            multiline
-            rows={3}
-            value={textPrompt}
-            onChange={e => setTextPrompt(e.target.value)}
-            fullWidth
-            margin="normal"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(textPrompt)}>
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
+          <Tooltip title={expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
+            <TextField
+              label={t('promptForModels')}
+              multiline
+              rows={3}
+              value={textPrompt}
+              onChange={e => setTextPrompt(e.target.value)}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(textPrompt)}>
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Tooltip>
           <Tooltip
             title={selectedTextModels.length
               ? `${t('genPrompt')} (${selectedTextModels.join(', ')})`
@@ -1426,43 +1451,47 @@ export default function App({ darkMode, setDarkMode }) {
             ))}
             <MenuItem value=""></MenuItem>
           </Select>
-          <TextField
-            label={t('metaPromptLabel')}
-            multiline
-            rows={2}
-            value={ttsMetaPrompt}
-            onChange={e => setTtsMetaPrompt(e.target.value)}
-            fullWidth
-            margin="normal"
-            placeholder="Read the following text as a very fast and energetic sports reporter, kind of like Gunnar Hololei"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsMetaPrompt)}>
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          <TextField
-            label={t('ttsPromptLabel')}
-            multiline
-            rows={4}
-            value={ttsPrompt}
-            InputProps={{
-              readOnly: true,
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsPrompt)}>
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-            fullWidth
-            margin="normal"
-          />
+          <Tooltip title={expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
+            <TextField
+              label={t('metaPromptLabel')}
+              multiline
+              rows={2}
+              value={ttsMetaPrompt}
+              onChange={e => setTtsMetaPrompt(e.target.value)}
+              fullWidth
+              margin="normal"
+              placeholder="Read the following text as a very fast and energetic sports reporter, kind of like Gunnar Hololei"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsMetaPrompt)}>
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
+            <TextField
+              label={t('ttsPromptLabel')}
+              multiline
+              rows={4}
+              value={ttsPrompt}
+              InputProps={{
+                readOnly: true,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsPrompt)}>
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+              fullWidth
+              margin="normal"
+            />
+          </Tooltip>
           <Typography variant="subtitle2">{t('selectedModels')}: {selectedTtsModels.join(', ')}</Typography>
           <Tooltip
             title={selectedTtsModels.length
@@ -1505,24 +1534,26 @@ export default function App({ darkMode, setDarkMode }) {
             ))}
             <MenuItem value=""></MenuItem>
           </Select>
-          <TextField
-            label={t('asrPromptLabel')}
-            multiline
-            rows={3}
-            value={asrPrompt}
-            onChange={e => setAsrPrompt(e.target.value)}
-            fullWidth
-            margin="normal"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(asrPrompt)}>
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
+          <Tooltip title={expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
+            <TextField
+              label={t('asrPromptLabel')}
+              multiline
+              rows={3}
+              value={asrPrompt}
+              onChange={e => setAsrPrompt(e.target.value)}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(asrPrompt)}>
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Tooltip>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t} />
           <PersistedGrid

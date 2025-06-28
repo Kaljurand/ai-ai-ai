@@ -39,5 +39,6 @@ npm test
 - Browse OpenRouter models in a dedicated tab. The table shows the sum of
   prompt and completion pricing for each model.
 - Click any table cell (except checkboxes) to view a Markdown preview of its contents.
+- Prompts can reference table values using `{{tab_name.table.ID.field}}` syntax which expands before API calls.
 
 This is not a production-ready system but demonstrates the flow described in the specification.
