@@ -37,7 +37,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import Draggable from 'react-draggable';
 import Paper from '@mui/material/Paper';
 import { DataGrid } from '@mui/x-data-grid';
-import { rowsToJSON, rowsToCSV, rowsToMarkdown, download } from './exportUtils';
+import { rowsToJSON, rowsToYAML, rowsToMarkdown, download } from './exportUtils';
 import { marked } from 'marked';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -256,11 +256,38 @@ function renderHtmlProgressCell(params) {
 }
 
 function ExportButtons({ rows, columns, name, t, children }) {
+  const [anchor, setAnchor] = useState(null);
   return (
     <Box sx={{ mb: 1 }}>
-      <Button size="small" onClick={() => download(rowsToJSON(rows, columns), 'application/json', `${name}.json`)}>{t('exportJSON')}</Button>
-      <Button size="small" onClick={() => download(rowsToCSV(rows, columns), 'text/csv', `${name}.csv`)} sx={{ ml: 1 }}>{t('exportCSV')}</Button>
-      <Button size="small" onClick={() => download(rowsToMarkdown(rows, columns), 'text/markdown', `${name}.md`)} sx={{ ml: 1 }}>{t('exportMD')}</Button>
+      <Button size="small" onClick={e => setAnchor(e.currentTarget)}>
+        {t('exportAs')}
+      </Button>
+      <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+        <MenuItem
+          onClick={() => {
+            download(rowsToJSON(rows, columns), 'application/json', `${name}.json`);
+            setAnchor(null);
+          }}
+        >
+          {t('exportJSON')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            download(rowsToYAML(rows, columns), 'text/yaml', `${name}.yaml`);
+            setAnchor(null);
+          }}
+        >
+          {t('exportYAML')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            download(rowsToMarkdown(rows, columns), 'text/markdown', `${name}.md`);
+            setAnchor(null);
+          }}
+        >
+          {t('exportMD')}
+        </MenuItem>
+      </Menu>
       {children}
     </Box>
   );
@@ -305,9 +332,10 @@ const translations = {
     audioSource: 'Audio source',
     asrSource: 'ASR source',
     delete: 'Delete',
-    exportJSON: 'Export JSON',
-    exportCSV: 'Export CSV',
-    exportMD: 'Export Markdown',
+    exportAs: 'Export table as\u2026',
+    exportJSON: 'JSON',
+    exportYAML: 'YAML',
+    exportMD: 'Markdown',
     clearData: 'Clear Data',
     clearKeys: 'Clear Keys',
     resetUi: 'Reset UI state',
@@ -376,9 +404,10 @@ const translations = {
     audioSource: 'Heli allikas',
     asrSource: 'ASR allikas',
     delete: 'Kustuta',
-    exportJSON: 'Ekspordi JSON',
-    exportCSV: 'Ekspordi CSV',
-    exportMD: 'Ekspordi Markdown',
+    exportAs: 'Ekspordi tabel…',
+    exportJSON: 'JSON',
+    exportYAML: 'YAML',
+    exportMD: 'Markdown',
     clearData: 'Puhasta andmed',
     clearKeys: 'Puhasta võtmid',
     resetUi: 'Taasta liidese olek',
@@ -447,9 +476,10 @@ const translations = {
     audioSource: 'H\u00e4\u00e4le allikas',
     asrSource: 'ASR allikas',
     delete: 'Kustuta',
-    exportJSON: 'Ekspordi JSON',
-    exportCSV: 'Ekspordi CSV',
-    exportMD: 'Ekspordi Markdown',
+    exportAs: 'Ekspordi tabel…',
+    exportJSON: 'JSON',
+    exportYAML: 'YAML',
+    exportMD: 'Markdown',
     clearData: 'Puhasta andmed',
     clearKeys: 'Puhasta võtmid',
     resetUi: 'Taasta liidese olõk',

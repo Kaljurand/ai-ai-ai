@@ -67,4 +67,8 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('stopPropagation')).toBe(true);
   });
+  it('includes exportYAML translation', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('exportYAML')).toBe(true);
+  });
 });
