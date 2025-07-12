@@ -32,6 +32,12 @@ import {
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
+import ArticleIcon from '@mui/icons-material/Article';
+import AudiotrackIcon from '@mui/icons-material/Audiotrack';
+import KeyboardVoiceIcon from '@mui/icons-material/KeyboardVoice';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import SettingsIcon from '@mui/icons-material/Settings';
 import Draggable from 'react-draggable';
 import Paper from '@mui/material/Paper';
 import { DataGrid } from '@mui/x-data-grid';
@@ -1332,12 +1338,12 @@ export default function App({ darkMode, setDarkMode }) {
   const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
   const [menuAnchor, setMenuAnchor] = useState(null);
   const tabsAll = [
-    { value: 'text', label: t('tabText') },
-    { value: 'audio', label: t('tabAudio') },
-    { value: 'asr', label: t('tabAsr') },
-    { value: 'log', label: t('tabLog') },
-    { value: 'models', label: t('tabModels') },
-    { value: 'config', label: t('tabSettings') }
+    { value: 'text', label: t('tabText'), icon: <ArticleIcon fontSize="small" /> },
+    { value: 'audio', label: t('tabAudio'), icon: <AudiotrackIcon fontSize="small" /> },
+    { value: 'asr', label: t('tabAsr'), icon: <KeyboardVoiceIcon fontSize="small" /> },
+    { value: 'log', label: t('tabLog'), icon: <ListAltIcon fontSize="small" /> },
+    { value: 'models', label: t('tabModels'), icon: <TableChartIcon fontSize="small" /> },
+    { value: 'config', label: t('tabSettings'), icon: <SettingsIcon fontSize="small" /> }
   ];
   const visibleTabs = isSmall ? tabsAll.slice(0, 3) : tabsAll;
   const extraTabs = isSmall ? tabsAll.slice(3) : [];
@@ -1348,7 +1354,12 @@ export default function App({ darkMode, setDarkMode }) {
       <AppBar position="fixed">
         <Toolbar>
           <PlaygroundIcon sx={{ mr: 1 }} />
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>{t('appTitle')}</Typography>
+          <Typography
+            variant="h6"
+            sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}
+          >
+            {t('appTitle')}
+          </Typography>
           <Tabs
             value={view}
             onChange={(e, v) => setView(v)}
@@ -1356,7 +1367,13 @@ export default function App({ darkMode, setDarkMode }) {
             indicatorColor="secondary"
           >
             {visibleTabs.map(ti => (
-              <Tab key={ti.value} value={ti.value} label={ti.label} />
+              <Tab
+                key={ti.value}
+                value={ti.value}
+                label={isSmall ? '' : ti.label}
+                icon={isSmall ? ti.icon : undefined}
+                aria-label={ti.label}
+              />
             ))}
           </Tabs>
           {extraTabs.length > 0 && (
