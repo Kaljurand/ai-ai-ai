@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './style.css';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 
 function useStoredState(key, initial) {
   const [state, setState] = useState(() => {
@@ -21,26 +22,44 @@ function useStoredState(key, initial) {
 
 function Root() {
   const [darkMode, setDarkMode] = useStoredState('darkMode', false);
-  const theme = useMemo(() => createTheme({
-    palette: {
-      mode: darkMode ? 'dark' : 'light',
-      primary: { main: '#2e7d32' }
-    },
-    components: {
-      MuiButton: {
-        styleOverrides: {
-          root: {
-            border: '1px solid #1b5e20',
-            backgroundColor: '#256428',
-            color: '#fff',
-            '&:hover': { backgroundColor: '#1b5e20' }
+  const theme = useMemo(
+    () =>
+      createTheme({
+        palette: {
+          mode: darkMode ? 'dark' : 'light',
+          primary: { main: '#2da44e' },
+          background: {
+            default: darkMode ? '#0d1117' : '#f6f8fa',
+            paper: darkMode ? '#161b22' : '#ffffff'
+          }
+        },
+        typography: {
+          fontFamily:
+            'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+        },
+        components: {
+          MuiAppBar: {
+            styleOverrides: {
+              root: {
+                backgroundColor: darkMode ? '#161b22' : '#24292e'
+              }
+            }
+          },
+          MuiButton: {
+            styleOverrides: {
+              root: {
+                borderRadius: 6,
+                textTransform: 'none'
+              }
+            }
           }
         }
-      }
-    }
-  }), [darkMode]);
+      }),
+    [darkMode]
+  );
   return (
     <ThemeProvider theme={theme}>
+      <CssBaseline />
       <App darkMode={darkMode} setDarkMode={setDarkMode} />
     </ThemeProvider>
   );
