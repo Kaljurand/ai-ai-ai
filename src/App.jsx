@@ -387,7 +387,9 @@ const translations = {
     modelDesc: 'Description',
     modality: 'Modality',
     pricing: 'Pricing',
-    duration: 'Duration'
+    duration: 'Duration',
+    tabSpec: 'Spec',
+    runSpec: 'Run'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -455,6 +457,8 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
+    tabSpec: 'Spec',
+    runSpec: 'Käivita'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -520,6 +524,8 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
+    tabSpec: 'Spec',
+    runSpec: 'Käivitä'
   }
 };
 
@@ -551,6 +557,8 @@ export default function App({ darkMode, setDarkMode }) {
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
   const [demoPrompt, setDemoPrompt] = useState('');
   const [demoInstruction, setDemoInstruction] = useState('');
+  const [specText, setSpecText] = useStoredState('specText', '# Texts\n## Models\n- gpt-nano\n## Prompts\n');
+  const [specPreview, setSpecPreview] = useState(false);
 
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([
@@ -692,6 +700,61 @@ export default function App({ darkMode, setDarkMode }) {
     a.addEventListener('loadedmetadata', () => resolve(a.duration || 0));
     a.src = url;
   });
+
+  const parseSpec = text => {
+    const lines = text.split(/\r?\n/);
+    const spec = { texts: { models: [], prompts: [] }, audio: { models: [], prompts: [] }, asr: { models: [], prompts: [] } };
+    let section = 'texts';
+    let phase = '';
+    let buf = [];
+    const flush = () => { if (buf.length) { spec[section].prompts.push(buf.join('\n').trim()); buf = []; } };
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^#\s*texts/i.test(t)) { flush(); section = 'texts'; phase = ''; continue; }
+      if (/^#\s*audio/i.test(t)) { flush(); section = 'audio'; phase = ''; continue; }
+      if (/^#\s*asr/i.test(t)) { flush(); section = 'asr'; phase = ''; continue; }
+      if (/^##\s*models/i.test(t)) { flush(); phase = 'models'; continue; }
+      if (/^##\s*prompts/i.test(t)) { flush(); phase = 'prompts'; continue; }
+      if (t === '---') { flush(); continue; }
+      if (phase === 'models' && t.startsWith('-')) spec[section].models.push(t.slice(1).trim());
+      else if (phase === 'prompts') buf.push(line);
+    }
+    flush();
+    return spec;
+  };
+
+  const runSpec = async () => {
+    const spec = parseSpec(specText);
+    for (const model of spec.texts.models) {
+      for (const prompt of spec.texts.prompts) {
+        setSelectedTextModels([model]);
+        setTextPrompt(prompt);
+        await generateTexts();
+      }
+    }
+    const textCount = texts.length;
+    for (let ti = 0; ti < textCount; ti++) {
+      for (const model of spec.audio.models) {
+        for (const prompt of spec.audio.prompts) {
+          setSelectedTextId(ti);
+          setSelectedTtsModels([model]);
+          setTtsPrompt(texts[ti]?.text || '');
+          setTtsMetaPrompt(prompt);
+          await synthesizeTts();
+        }
+      }
+    }
+    const audioCount = audios.length;
+    for (let ai = 0; ai < audioCount; ai++) {
+      for (const model of spec.asr.models) {
+        for (const prompt of spec.asr.prompts) {
+          setSelectedAsrModels([model]);
+          setAsrPrompt(prompt);
+          await transcribe(ai);
+        }
+      }
+    }
+  };
 
   const mockMode = !apiKeys.openai && !apiKeys.google && !apiKeys.openrouter;
 
@@ -1338,6 +1401,7 @@ export default function App({ darkMode, setDarkMode }) {
   const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
   const [menuAnchor, setMenuAnchor] = useState(null);
   const tabsAll = [
+    { value: 'spec', label: t('tabSpec'), icon: <ArticleIcon fontSize="small" /> },
     { value: 'text', label: t('tabText'), icon: <ArticleIcon fontSize="small" /> },
     { value: 'audio', label: t('tabAudio'), icon: <AudiotrackIcon fontSize="small" /> },
     { value: 'asr', label: t('tabAsr'), icon: <KeyboardVoiceIcon fontSize="small" /> },
@@ -1401,6 +1465,19 @@ export default function App({ darkMode, setDarkMode }) {
         </Toolbar>
       </AppBar>
       <Box sx={{ pt: { xs: '56px', sm: '64px' } }}>
+      {view === 'spec' && (
+        <div className="content">
+          <Box sx={{ mb: 1 }}>
+            <Button size="small" onClick={() => setSpecPreview(p => !p)}>{t('preview')}</Button>
+            <Button size="small" variant="contained" onClick={runSpec} sx={{ ml: 1 }}>{t('runSpec')}</Button>
+          </Box>
+          {specPreview ? (
+            <div dangerouslySetInnerHTML={{ __html: marked.parse(specText) }} />
+          ) : (
+            <TextField multiline fullWidth minRows={10} value={specText} onChange={e => setSpecText(e.target.value)} />
+          )}
+        </div>
+      )}
       {view === 'text' && (
         <div className="content">
           <Typography variant="subtitle2">{t('selectedModels')}: {selectedTextModels.join(', ')}</Typography>
