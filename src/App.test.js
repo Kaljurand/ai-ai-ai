@@ -37,6 +37,12 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('@mui/icons-material/MoreVert')).toBe(true);
   });
+  it('imports tab icons', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('@mui/icons-material/Article')).toBe(true);
+    expect(code.includes('@mui/icons-material/Audiotrack')).toBe(true);
+    expect(code.includes('@mui/icons-material/KeyboardVoice')).toBe(true);
+  });
   it('includes showSelected translation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('showSelected')).toBe(true);
