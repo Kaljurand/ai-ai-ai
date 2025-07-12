@@ -466,8 +466,8 @@ const translations = {
     tabModels: 'Mudelid',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
-    examplePromptLabel: 'Näütus prompt',
-    exampleInstrLabel: 'Näütus prompt',
+    examplePromptLabel: 'Näütüs prompt',
+    exampleInstrLabel: 'Näütüs prompt',
     uploadPrompt: 'Laadi tekst',
     useText: 'Saada h\u00e4\u00e4le',
     textId: 'ID',
@@ -551,29 +551,6 @@ export default function App({ darkMode, setDarkMode }) {
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
   const [demoPrompt, setDemoPrompt] = useState('');
   const [demoInstruction, setDemoInstruction] = useState('');
-
-  // Add URL query parameter handling
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const textModels = params.get('text')?.split(',').filter(Boolean);
-    const ttsModels = params.get('tts')?.split(',').filter(Boolean);
-    const asrModels = params.get('asr')?.split(',').filter(Boolean);
-
-    if (textModels?.length) setSelectedTextModels(textModels);
-    if (ttsModels?.length) setSelectedTtsModels(ttsModels);
-    if (asrModels?.length) setSelectedAsrModels(asrModels);
-  }, []);
-
-  // Update URL when model selections change
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (selectedTextModels.length) params.set('text', selectedTextModels.join(','));
-    if (selectedTtsModels.length) params.set('tts', selectedTtsModels.join(','));
-    if (selectedAsrModels.length) params.set('asr', selectedAsrModels.join(','));
-
-    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
-    window.history.replaceState({}, '', newUrl);
-  }, [selectedTextModels, selectedTtsModels, selectedAsrModels]);
 
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([
