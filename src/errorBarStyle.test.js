@@ -6,4 +6,8 @@ describe('error bar style', () => {
     const css = fs.readFileSync('src/style.css', 'utf8');
     expect(css.includes('.error-bar')).toBe(true);
   });
+  it('contains dot-spinner class', () => {
+    const css = fs.readFileSync('src/style.css', 'utf8');
+    expect(css.includes('.dot-spinner')).toBe(true);
+  });
 });
