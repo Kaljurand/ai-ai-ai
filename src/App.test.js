@@ -82,6 +82,10 @@ describe('App.jsx compilation', () => {
     expect(/Tooltip\s*\n\s*title={selectedTextModels.length/.test(code)).toBe(true);
     expect(/Tooltip\s*\n\s*title={selectedTtsModels.length/.test(code)).toBe(true);
   });
+  it('shows models tab tooltip with selected models', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('modelsTooltip')).toBe(true);
+  });
   it('ignores checkbox clicks', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes("closest('input[type=\"checkbox\"]')")).toBe(true);
