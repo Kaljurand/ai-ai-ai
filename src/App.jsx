@@ -1348,6 +1348,8 @@ export default function App({ darkMode, setDarkMode }) {
   const visibleTabs = isSmall ? tabsAll.slice(0, 3) : tabsAll;
   const extraTabs = isSmall ? tabsAll.slice(3) : [];
 
+  const modelsTooltip = `${t('tabText')}: ${selectedTextModels.join(', ')} | ${t('tabAudio')}: ${selectedTtsModels.join(', ')} | ${t('tabAsr')}: ${selectedAsrModels.join(', ')}`;
+
 
   return (
     <>
@@ -1366,15 +1368,22 @@ export default function App({ darkMode, setDarkMode }) {
             textColor="inherit"
             indicatorColor="secondary"
           >
-            {visibleTabs.map(ti => (
-              <Tab
-                key={ti.value}
-                value={ti.value}
-                label={isSmall ? '' : ti.label}
-                icon={isSmall ? ti.icon : undefined}
-                aria-label={ti.label}
-              />
-            ))}
+            {visibleTabs.map(ti => {
+              const tabEl = (
+                <Tab
+                  key={ti.value}
+                  value={ti.value}
+                  label={isSmall ? '' : ti.label}
+                  icon={isSmall ? ti.icon : undefined}
+                  aria-label={ti.label}
+                />
+              );
+              return ti.value === 'models' ? (
+                <Tooltip key={ti.value} title={modelsTooltip} placement="bottom">
+                  {tabEl}
+                </Tooltip>
+              ) : tabEl;
+            })}
           </Tabs>
           {extraTabs.length > 0 && (
             <>
@@ -1403,7 +1412,6 @@ export default function App({ darkMode, setDarkMode }) {
       <Box sx={{ pt: { xs: '56px', sm: '64px' } }}>
       {view === 'text' && (
         <div className="content">
-          <Typography variant="subtitle2">{t('selectedModels')}: {selectedTextModels.join(', ')}</Typography>
           <Select
             value={demoPrompt}
             onChange={e => { setDemoPrompt(e.target.value); setTextPrompt(e.target.value); }}
@@ -1509,7 +1517,6 @@ export default function App({ darkMode, setDarkMode }) {
               margin="normal"
             />
           </Tooltip>
-          <Typography variant="subtitle2">{t('selectedModels')}: {selectedTtsModels.join(', ')}</Typography>
           <Tooltip
             title={selectedTtsModels.length
               ? `${t('generateAudio')} (${selectedTtsModels.join(', ')})`
@@ -1537,7 +1544,6 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'asr' && (
         <div className="content">
-          <Typography variant="subtitle2">{t('selectedModels')}: {selectedAsrModels.join(', ')}</Typography>
           <Select
             value={demoPrompt}
             onChange={e => { setDemoPrompt(e.target.value); setAsrPrompt(e.target.value); }}
