@@ -373,6 +373,7 @@ const translations = {
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
     openrouterKey: 'OpenRouter API key',
+    mistralKey: 'Mistral API key',
     language: 'Language',
     darkMode: 'Dark mode',
     mockMode: 'Mock mode active: no API key',
@@ -440,6 +441,7 @@ const translations = {
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
+    mistralKey: 'Mistral API v\u00f5ti',
     language: 'Keel',
     darkMode: 'Tume re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
@@ -504,6 +506,7 @@ const translations = {
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
+    mistralKey: 'Mistral API v\u00f5ti',
     language: 'Kiil',
     darkMode: 'Tummas re\u017eiim',
     mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
@@ -530,7 +533,7 @@ function useTranslation() {
 }
 
 export default function App({ darkMode, setDarkMode }) {
-  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '', openrouter: '' });
+  const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '', openrouter: '', mistral: '' });
   const { t, lang, setLang } = useTranslation();
   const [texts, setTexts] = useStoredState('texts', []);
   const [audios, setAudios] = useStoredState('audios', []);
@@ -559,6 +562,7 @@ export default function App({ darkMode, setDarkMode }) {
   const [selectedTtsModels, setSelectedTtsModels] = useStoredState('selectedTtsModels', []);
   const [ttsMetaPrompt, setTtsMetaPrompt] = useStoredState('ttsMetaPrompt', 'Convert the following text to audio speaking in double speed:');
   const [asrModels, setAsrModels] = useState([]);
+  const mistralModels = ['voxtral-mini-2507'];
   const [selectedAsrModels, setSelectedAsrModels] = useStoredState('selectedAsrModels', []);
   const [showSelectedOnly, setShowSelectedOnly] = useStoredState('modelsShowSelected', false);
   const [recording, setRecording] = useState(false);
@@ -693,7 +697,7 @@ export default function App({ darkMode, setDarkMode }) {
     a.src = url;
   });
 
-  const mockMode = !apiKeys.openai && !apiKeys.google && !apiKeys.openrouter;
+  const mockMode = !apiKeys.openai && !apiKeys.google && !apiKeys.openrouter && !apiKeys.mistral;
 
   useEffect(() => {
     (async () => {
@@ -765,7 +769,8 @@ export default function App({ darkMode, setDarkMode }) {
   useEffect(() => {
     const combined = [
       ...openAiModels.filter(m => /whisper|speech|audio|transcribe/i.test(m)).map(m => ({ id: m, name: m, provider: 'openai' })),
-      ...googleModels.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m, provider: 'google' }))
+      ...googleModels.filter(m => /speech|audio|transcribe|asr/i.test(m)).map(m => ({ id: m, name: m, provider: 'google' })),
+      ...mistralModels.map(m => ({ id: m, name: m, provider: 'mistral' }))
     ];
     if (combined.length) {
       setAsrModels(combined);
@@ -1035,6 +1040,23 @@ export default function App({ darkMode, setDarkMode }) {
         } catch (e) {
           showError(e.message);
         }
+      } else if (mistralModels.includes(model)) {
+        const form = new FormData();
+        form.append('model', model);
+        form.append('file', blob, 'audio.webm');
+        if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
+        try {
+          const url = 'https://api.mistral.ai/v1/audio/transcriptions';
+          const log = startLog('POST', url, '<audio>', model);
+          const res = await fetchWithLoading(url, { method: 'POST', headers: { 'x-api-key': apiKeys.mistral }, body: form });
+          const data = await res.json().catch(() => ({}));
+          finishLog(log, data);
+          if (!res.ok) { setTranscripts(t => t.filter((_,i)=>i!==rowIndex)); throw new Error(data.error?.message || 'Transcription failed'); }
+          const text = data.text?.trim();
+          if (text) finish(text, model);
+        } catch (e) {
+          showError(e.message);
+        }
       } else if (openAiModels.includes(model)) {
         const form = new FormData();
         form.append('model', model);
@@ -1128,7 +1150,7 @@ export default function App({ darkMode, setDarkMode }) {
   const clearKeys = () => {
     clearTables();
     localStorage.removeItem('apiKeys');
-    setApiKeys({ openai: '', google: '', openrouter: '' });
+    setApiKeys({ openai: '', google: '', openrouter: '', mistral: '' });
   };
 
   const resetUi = () => {
@@ -1641,6 +1663,14 @@ export default function App({ darkMode, setDarkMode }) {
             type="password"
             value={apiKeys.openrouter}
             onChange={e => setApiKeys({ ...apiKeys, openrouter: e.target.value })}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label={t('mistralKey')}
+            type="password"
+            value={apiKeys.mistral}
+            onChange={e => setApiKeys({ ...apiKeys, mistral: e.target.value })}
             fullWidth
             margin="normal"
           />

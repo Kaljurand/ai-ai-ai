@@ -25,6 +25,10 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('openrouterKey')).toBe(true);
   });
+  it('contains Mistral API key label', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('mistralKey')).toBe(true);
+  });
   it('contains selectedModels label', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('selectedModels')).toBe(true);
