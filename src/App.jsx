@@ -562,7 +562,7 @@ export default function App({ darkMode, setDarkMode }) {
   const [selectedTtsModels, setSelectedTtsModels] = useStoredState('selectedTtsModels', []);
   const [ttsMetaPrompt, setTtsMetaPrompt] = useStoredState('ttsMetaPrompt', 'Convert the following text to audio speaking in double speed:');
   const [asrModels, setAsrModels] = useState([]);
-  const mistralModels = ['voxtral-mini-2507'];
+  const mistralModels = ['voxtral-mini-2507', 'voxtral-small-2507'];
   const [selectedAsrModels, setSelectedAsrModels] = useStoredState('selectedAsrModels', []);
   const [showSelectedOnly, setShowSelectedOnly] = useStoredState('modelsShowSelected', false);
   const [recording, setRecording] = useState(false);

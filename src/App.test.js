@@ -29,6 +29,10 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('mistralKey')).toBe(true);
   });
+  it('includes voxtral small model', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('voxtral-small-2507')).toBe(true);
+  });
   it('contains selectedModels label', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('selectedModels')).toBe(true);
