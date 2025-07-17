@@ -41,3 +41,5 @@ th, td { border: 1px solid #ccc; padding: 0.25rem; }
   table, th, td { font-size: 0.9rem; }
   .error-bar { font-size: 0.75rem; padding: 3px 6px; }
 }
+
+.dot-spinner{display:inline-block;width:1.5em;text-align:left}
