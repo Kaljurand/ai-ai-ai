@@ -63,6 +63,10 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('resetUi')).toBe(true);
   });
+  it('uses DotSpinner component', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('DotSpinner')).toBe(true);
+  });
   it('uses pending rows', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('pending: !mockMode')).toBe(true);

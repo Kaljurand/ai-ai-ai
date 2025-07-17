@@ -18,7 +18,6 @@ import {
   Checkbox,
   FormControlLabel,
   Switch,
-  CircularProgress,
   Box,
   Divider,
   Dialog,
@@ -48,6 +47,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
+import DotSpinner from './DotSpinner';
 
 function PaperComponent(props) {
   return (
@@ -271,14 +271,20 @@ function renderHtmlCell(params, tab) {
 
 function renderProgressCell(params, tab) {
   if (params.row.pending && (params.value === undefined || params.value === '')) {
-    return <CircularProgress size={16} />;
+    return <DotSpinner className="dot-spinner" />;
+  }
+  if (params.row.error) {
+    return <span style={{color:'red'}}>{params.row.error}</span>;
   }
   return renderCell(params, tab);
 }
 
 function renderHtmlProgressCell(params, tab) {
   if (params.row.pending && !params.value) {
-    return <CircularProgress size={16} />;
+    return <DotSpinner className="dot-spinner" />;
+  }
+  if (params.row.error) {
+    return <span style={{color:'red'}}>{params.row.error}</span>;
   }
   return renderHtmlCell(params, tab);
 }
@@ -854,7 +860,12 @@ export default function App({ darkMode, setDarkMode }) {
         const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         finishLog(log, data);
-        if (!res.ok) { showError(data.error?.message || 'Text generation failed'); setTexts(t => t.filter((_,i)=>i!==rowIndex)); continue; }
+        if (!res.ok) {
+          const msg = data.error?.message || 'Text generation failed';
+          showError(msg);
+          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
+          continue;
+        }
         const text = data.choices?.[0]?.message?.content?.trim();
         if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       } else if (googleModels.includes(model)) {
@@ -864,7 +875,12 @@ export default function App({ darkMode, setDarkMode }) {
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         finishLog(log, data);
-        if (!res.ok) { showError(data.error?.message || 'Text generation failed'); setTexts(t => t.filter((_,i)=>i!==rowIndex)); continue; }
+        if (!res.ok) {
+          const msg = data.error?.message || 'Text generation failed';
+          showError(msg);
+          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
+          continue;
+        }
         const text = data.candidates?.[0]?.output?.trim();
         if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       } else {
@@ -874,7 +890,12 @@ export default function App({ darkMode, setDarkMode }) {
         const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         finishLog(log, data);
-        if (!res.ok) { showError(data.error?.message || 'Text generation failed'); setTexts(t => t.filter((_,i)=>i!==rowIndex)); continue; }
+        if (!res.ok) {
+          const msg = data.error?.message || 'Text generation failed';
+          showError(msg);
+          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
+          continue;
+        }
         const text = data.choices?.[0]?.message?.content?.trim();
         if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       }
@@ -954,8 +975,9 @@ export default function App({ darkMode, setDarkMode }) {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           finishLog(log, err, cost);
-          setAudios(a => a.filter((_,i)=>i!==rowIndex));
-          showError(err.error?.message || 'TTS request failed');
+          const msg = err.error?.message || 'TTS request failed';
+          showError(msg);
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
           continue;
         }
         const blob = await res.blob();
@@ -981,8 +1003,9 @@ export default function App({ darkMode, setDarkMode }) {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           finishLog(log, err, cost);
-          setAudios(a => a.filter((_,i)=>i!==rowIndex));
-          showError(err.error?.message || 'TTS request failed');
+          const msg = err.error?.message || 'TTS request failed';
+          showError(msg);
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
           continue;
         }
         const blob = await res.blob();
@@ -1034,7 +1057,12 @@ export default function App({ darkMode, setDarkMode }) {
           const res = await fetchWithLoading(url, { method: 'POST', headers, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
-          if (!res.ok) { setTranscripts(t => t.filter((_,i)=>i!==rowIndex)); throw new Error(data.error?.message || 'Transcription failed'); }
+          if (!res.ok) {
+            const msg = data.error?.message || 'Transcription failed';
+            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
+            showError(msg);
+            continue;
+          }
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {
@@ -1051,7 +1079,12 @@ export default function App({ darkMode, setDarkMode }) {
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'x-api-key': apiKeys.mistral }, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
-          if (!res.ok) { setTranscripts(t => t.filter((_,i)=>i!==rowIndex)); throw new Error(data.error?.message || 'Transcription failed'); }
+          if (!res.ok) {
+            const msg = data.error?.message || 'Transcription failed';
+            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
+            showError(msg);
+            continue;
+          }
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {
@@ -1068,7 +1101,12 @@ export default function App({ darkMode, setDarkMode }) {
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
-          if (!res.ok) { setTranscripts(t => t.filter((_,i)=>i!==rowIndex)); throw new Error(data.error?.message || 'Transcription failed'); }
+          if (!res.ok) {
+            const msg = data.error?.message || 'Transcription failed';
+            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
+            showError(msg);
+            continue;
+          }
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {
@@ -1196,8 +1234,9 @@ export default function App({ darkMode, setDarkMode }) {
 
   const audioRows = audios.map((a, i) => ({ id: i, ...a, _index: i }));
   const renderAudioCell = p => (
-    p.row.pending ? <CircularProgress size={16} /> : (
+    p.row.pending ? <DotSpinner className="dot-spinner" /> : (
       <div>
+        {p.row.error && <div style={{color:'red'}}>{p.row.error}</div>}
         {p.row.url && <audio controls src={p.row.url}></audio>}
         {p.row.storageError && <div style={{color:'red'}}>{t('storageFailed')}</div>}
       </div>
@@ -1423,7 +1462,7 @@ export default function App({ darkMode, setDarkMode }) {
           )}
           {loadingCount > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-              <CircularProgress size={20} color="inherit" />
+              <DotSpinner className="dot-spinner" />
               {loadingCount > 1 && (
                 <Typography variant="caption" sx={{ ml: 0.5 }}>{loadingCount}</Typography>
               )}
