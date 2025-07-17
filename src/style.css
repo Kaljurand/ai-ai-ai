@@ -42,4 +42,10 @@ th, td { border: 1px solid #ccc; padding: 0.25rem; }
   .error-bar { font-size: 0.75rem; padding: 3px 6px; }
 }
 
-.dot-spinner{display:inline-block;width:1.5em;text-align:left}
+.dot-spinner{
+  display:flex;
+  justify-content:center;
+  flex:1;
+  color:var(--mui-palette-primary-main,#2da44e);
+  font-size:1.5rem
+}
