@@ -336,6 +336,7 @@ const translations = {
     tabLog: 'Log',
     tabSettings: 'Settings',
     tabModels: 'Models',
+    generate: 'Generate',
     genPrompt: 'Generate Text',
     promptForModels: 'Prompt for text generator',
     examplePromptLabel: 'Example prompt',
@@ -405,6 +406,7 @@ const translations = {
     tabLog: 'Logi',
     tabSettings: 'Seaded',
     tabModels: 'Mudelid',
+    generate: 'Genereeri',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     examplePromptLabel: 'Näidis prompt',
@@ -474,6 +476,7 @@ const translations = {
     tabLog: 'Logi',
     tabSettings: 'S\u00f6tmis',
     tabModels: 'Mudelid',
+    generate: 'Genereeri',
     genPrompt: 'Genereeri tekst',
     promptForModels: 'P\u00e4ringu sisu',
     examplePromptLabel: 'Näütüs prompt',
@@ -1529,11 +1532,17 @@ export default function App({ darkMode, setDarkMode }) {
             />
           </Tooltip>
           <Tooltip
-            title={selectedTextModels.length
-              ? `${t('genPrompt')} (${selectedTextModels.join(', ')})`
-              : t('genPrompt')}
+            title={selectedTextModels.join('\n')}
+            componentsProps={{ tooltip: { sx: { whiteSpace: 'pre-line' } } }}
           >
-            <Button size="small" onClick={generateTexts}>{t('genPrompt')}</Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              onClick={generateTexts}
+            >
+              {t('generate')}
+            </Button>
           </Tooltip>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={textRows} columns={textColumns} name="texts" t={t} />
@@ -1601,11 +1610,18 @@ export default function App({ darkMode, setDarkMode }) {
             />
           </Tooltip>
           <Tooltip
-            title={selectedTtsModels.length
-              ? `${t('generateAudio')} (${selectedTtsModels.join(', ')})`
-              : t('generateAudio')}
+            title={selectedTtsModels.join('\n')}
+            componentsProps={{ tooltip: { sx: { whiteSpace: 'pre-line' } } }}
           >
-            <Button size="small" variant="contained" onClick={synthesizeTts} sx={{ mt: 1 }}>{t('generateAudio')}</Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              onClick={synthesizeTts}
+              sx={{ mt: 1 }}
+            >
+              {t('generate')}
+            </Button>
           </Tooltip>
           <Button size="small" component="label" sx={{ mt: 1, ml: 1 }}>
             {t('uploadAudio')}
@@ -1664,12 +1680,17 @@ export default function App({ darkMode, setDarkMode }) {
             <audio controls src={audios[selectedAudioId].url} style={{ width: '100%', marginTop: '0.5rem' }} />
           )}
           <Tooltip
-            title={selectedAsrModels.length
-              ? `${t('generateTranscript')} (${selectedAsrModels.join(', ')})`
-              : t('generateTranscript')}
+            title={selectedAsrModels.join('\n')}
+            componentsProps={{ tooltip: { sx: { whiteSpace: 'pre-line' } } }}
           >
-            <Button size="small" variant="contained" onClick={generateTranscripts} sx={{ mt: 1 }}>
-              {t('generateTranscript')}
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              onClick={generateTranscripts}
+              sx={{ mt: 1 }}
+            >
+              {t('generate')}
             </Button>
           </Tooltip>
           <Divider sx={{ my: 2 }} />
