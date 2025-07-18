@@ -6,6 +6,8 @@ System prompt: generate a text as input for TTS. That means: don't be/use a chat
 
 ### Prompts
 
+- Generate 10 tongue twisters, separated by line breaks.
+- Show the main content of <https://pohiseadus.ee/sisu/3554>
 - Write an Estonian haiku in the style of Jaan Pehk.
 - Write an Estonian sports report, something like "Eesti esireket Mark Lajal (ATP 167.) teenis Wimbledoni sl\u00e4mmiturniiri kvalifikatsiooni avaringis 3:6, 6:4, 6:3 v\u00f5idu Suurbritanniat esindava Jan Choinski (ATP 202.) \u00fcle.
 - Make a list of all Estonian prime ministers in the order they took office. Just names separated by commas.
