@@ -91,8 +91,8 @@ describe('App.jsx compilation', () => {
   });
   it('shows generate tooltips with models', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(/Tooltip\s*\n\s*title={selectedTextModels.length/.test(code)).toBe(true);
-    expect(/Tooltip\s*\n\s*title={selectedTtsModels.length/.test(code)).toBe(true);
+    expect(/Tooltip\s*\n\s*title={selectedTextModels\.join/.test(code)).toBe(true);
+    expect(/Tooltip\s*\n\s*title={selectedTtsModels\.join/.test(code)).toBe(true);
   });
   it('shows models tab tooltip with selected models', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
@@ -108,6 +108,6 @@ describe('App.jsx compilation', () => {
   });
   it('shows ASR generate tooltip with models', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(/Tooltip\s*\n\s*title={selectedAsrModels.length/.test(code)).toBe(true);
+    expect(/Tooltip\s*\n\s*title={selectedAsrModels\.join/.test(code)).toBe(true);
   });
 });

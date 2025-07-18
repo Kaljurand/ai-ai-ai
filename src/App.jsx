@@ -710,6 +710,14 @@ export default function App({ darkMode, setDarkMode }) {
     return new Blob([arr], { type: mime });
   };
 
+  const mimeExtension = mime => {
+    if (/mpeg|mp3/.test(mime)) return 'mp3';
+    if (/ogg/.test(mime)) return 'ogg';
+    if (/wav/.test(mime)) return 'wav';
+    if (/webm/.test(mime)) return 'webm';
+    return 'dat';
+  };
+
   const audioDuration = url => new Promise(resolve => {
     const a = new Audio();
     a.addEventListener('loadedmetadata', () => resolve(a.duration || 0));
@@ -1060,7 +1068,7 @@ export default function App({ darkMode, setDarkMode }) {
         const orModel = openRouterMap[model].id;
         const form = new FormData();
         form.append('model', orModel);
-        form.append('file', blob, 'audio.webm');
+        form.append('file', blob, `audio.${mimeExtension(blob.type)}`);
         if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
@@ -1084,7 +1092,7 @@ export default function App({ darkMode, setDarkMode }) {
       } else if (mistralModels.includes(model)) {
         const form = new FormData();
         form.append('model', model);
-        form.append('file', blob, 'audio.webm');
+        form.append('file', blob, `audio.${mimeExtension(blob.type)}`);
         if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://api.mistral.ai/v1/audio/transcriptions';
@@ -1106,7 +1114,7 @@ export default function App({ darkMode, setDarkMode }) {
       } else if (openAiModels.includes(model)) {
         const form = new FormData();
         form.append('model', model);
-        form.append('file', blob, 'audio.webm');
+        form.append('file', blob, `audio.${mimeExtension(blob.type)}`);
         if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
