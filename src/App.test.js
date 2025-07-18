@@ -110,4 +110,9 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(/Tooltip\s*\n\s*title={selectedAsrModels\.join/.test(code)).toBe(true);
   });
+  it('contains ASR example prompts', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('predefinedAsrPrompts')).toBe(true);
+    expect(code.includes('Summarize the transcription in 140 characters.')).toBe(true);
+  });
 });

@@ -546,8 +546,9 @@ export default function App({ darkMode, setDarkMode }) {
   const [selectedAudioId, setSelectedAudioId] = useState(null);
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
-  const [demoPrompt, setDemoPrompt] = useState('');
-  const [demoInstruction, setDemoInstruction] = useState('');
+  const [promptAnchor, setPromptAnchor] = useState(null);
+  const [instrAnchor, setInstrAnchor] = useState(null);
+  const [asrPromptAnchor, setAsrPromptAnchor] = useState(null);
 
   const [view, setView] = useState('audio');
   const [ttsModels, setTtsModels] = useState([
@@ -579,6 +580,14 @@ export default function App({ darkMode, setDarkMode }) {
     'Expand all the abbreviations before you start speaking, e.g. "25 km/h-ni" should be expanded to "kahek\u00fcmneviie kilomeetrini tunnis" to make it easier to read.',
     'Read the following text very fast as an energetic sports commentator, kind of like Gunnar Hololei.',
     'Read the following text with a Finnish accent, e.g. screw up palatalization and "v\u00e4lted"'
+  ];
+
+  const predefinedAsrPrompts = [
+    'Transcribe without punctuation marks (unless dictated) and without formatting numerals as digits.',
+    'Summarize the transcription in 140 characters.',
+    'List the speakers with timestamps.',
+    'Translate the transcription into English.',
+    'Give a bullet point overview of the main topics.'
   ];
 
   useEffect(() => {
@@ -1469,19 +1478,6 @@ export default function App({ darkMode, setDarkMode }) {
       <Box sx={{ pt: { xs: '56px', sm: '64px' } }}>
       {view === 'text' && (
         <div className="content">
-          <Select
-            value={demoPrompt}
-            onChange={e => { setDemoPrompt(e.target.value); setTextPrompt(e.target.value); }}
-            fullWidth
-            displayEmpty
-            sx={{ mt: 1 }}
-          >
-            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
-            {predefinedPrompts.map((p, i) => (
-              <MenuItem key={i} value={p}>{p}</MenuItem>
-            ))}
-            <MenuItem value=""></MenuItem>
-          </Select>
           <Tooltip title={expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
             <TextField
               label={t('promptForModels')}
@@ -1494,14 +1490,25 @@ export default function App({ darkMode, setDarkMode }) {
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(textPrompt)}>
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <IconButton size="small" onClick={() => navigator.clipboard.writeText(textPrompt)}>
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={e => setPromptAnchor(e.currentTarget)}>
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </InputAdornment>
                 )
               }}
             />
           </Tooltip>
+          <Menu anchorEl={promptAnchor} open={Boolean(promptAnchor)} onClose={() => setPromptAnchor(null)}>
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
+            {predefinedPrompts.map((p, i) => (
+              <MenuItem key={i} onClick={() => { setTextPrompt(p); setPromptAnchor(null); }}>{p}</MenuItem>
+            ))}
+          </Menu>
           <Tooltip
             title={selectedTextModels.join('\n')}
             componentsProps={{ tooltip: { sx: { whiteSpace: 'pre-line' } } }}
@@ -1527,18 +1534,6 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'audio' && (
         <div className="content">
-          <Select
-            value={demoInstruction}
-            onChange={e => { setDemoInstruction(e.target.value); setTtsMetaPrompt(e.target.value); }}
-            fullWidth
-            displayEmpty
-          >
-            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
-            {predefinedInstructions.map((p, i) => (
-              <MenuItem key={i} value={p}>{p}</MenuItem>
-            ))}
-            <MenuItem value=""></MenuItem>
-          </Select>
           <Tooltip title={expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
             <TextField
               label={t('metaPromptLabel')}
@@ -1552,14 +1547,25 @@ export default function App({ darkMode, setDarkMode }) {
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsMetaPrompt)}>
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <IconButton size="small" onClick={() => navigator.clipboard.writeText(ttsMetaPrompt)}>
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={e => setInstrAnchor(e.currentTarget)}>
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </InputAdornment>
                 )
               }}
             />
           </Tooltip>
+          <Menu anchorEl={instrAnchor} open={Boolean(instrAnchor)} onClose={() => setInstrAnchor(null)}>
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
+            {predefinedInstructions.map((p, i) => (
+              <MenuItem key={i} onClick={() => { setTtsMetaPrompt(p); setInstrAnchor(null); }}>{p}</MenuItem>
+            ))}
+          </Menu>
           <Tooltip title={expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
             <TextField
               label={t('ttsPromptLabel')}
@@ -1614,19 +1620,6 @@ export default function App({ darkMode, setDarkMode }) {
       )}
       {view === 'asr' && (
         <div className="content">
-          <Select
-            value={demoPrompt}
-            onChange={e => { setDemoPrompt(e.target.value); setAsrPrompt(e.target.value); }}
-            fullWidth
-            displayEmpty
-            sx={{ mt: 1 }}
-          >
-            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
-            {predefinedPrompts.map((p, i) => (
-              <MenuItem key={i} value={p}>{p}</MenuItem>
-            ))}
-            <MenuItem value=""></MenuItem>
-          </Select>
           <Tooltip title={expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
             <TextField
               label={t('asrPromptLabel')}
@@ -1639,14 +1632,25 @@ export default function App({ darkMode, setDarkMode }) {
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(asrPrompt)}>
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <IconButton size="small" onClick={() => navigator.clipboard.writeText(asrPrompt)}>
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={e => setAsrPromptAnchor(e.currentTarget)}>
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </InputAdornment>
                 )
               }}
             />
           </Tooltip>
+          <Menu anchorEl={asrPromptAnchor} open={Boolean(asrPromptAnchor)} onClose={() => setAsrPromptAnchor(null)}>
+            <MenuItem value="" disabled>{t('examplePromptLabel')}</MenuItem>
+            {predefinedAsrPrompts.map((p, i) => (
+              <MenuItem key={i} onClick={() => { setAsrPrompt(p); setAsrPromptAnchor(null); }}>{p}</MenuItem>
+            ))}
+          </Menu>
           {selectedAudioId != null && audios[selectedAudioId] && (
             <audio controls src={audios[selectedAudioId].url} style={{ width: '100%', marginTop: '0.5rem' }} />
           )}
