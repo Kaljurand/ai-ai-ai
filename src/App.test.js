@@ -29,6 +29,13 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('mistralKey')).toBe(true);
   });
+  it('contains API key URLs', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('openaiKeyUrl')).toBe(true);
+    expect(code.includes('googleKeyUrl')).toBe(true);
+    expect(code.includes('openrouterKeyUrl')).toBe(true);
+    expect(code.includes('mistralKeyUrl')).toBe(true);
+  });
   it('includes voxtral small model', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('voxtral-small-2507')).toBe(true);
