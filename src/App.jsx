@@ -148,7 +148,14 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
         autoHeight
         getRowHeight={() => 'auto'}
         disableRowSelectionOnClick
-        sx={{ '& .MuiDataGrid-cell': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}
+        sx={{ '& .MuiDataGrid-cell': {
+          whiteSpace: 'normal',
+          overflowWrap: 'anywhere',
+          display: '-webkit-box',
+          WebkitBoxOrient: 'vertical',
+          WebkitLineClamp: 3,
+          overflow: 'hidden'
+        } }}
         sortingOrder={['asc', 'desc']}
         sortModel={sortModel}
         onSortModelChange={setSortModel}
@@ -202,11 +209,15 @@ function renderCell(params, tab) {
   }
   if (/^\s*\{.*\}\s*$/.test(val)) {
     try { val = JSON.stringify(JSON.parse(val)); } catch {}
-    if (val.length > 30) val = val.slice(0, 15) + '...' + val.slice(-10);
-  } else if (val.length > 50) {
-    val = val.slice(0, 25) + '...' + val.slice(-10);
   }
-  const style = { whiteSpace: 'normal', wordWrap: 'break-word' };
+  const style = {
+    whiteSpace: 'normal',
+    wordWrap: 'break-word',
+    display: '-webkit-box',
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden'
+  };
   if (['timestamp', 'time', 'provider', 'textSource', 'audioSource', 'asrSource', 'wer'].includes(params.field)) {
     style.fontFamily = 'monospace';
   }
@@ -227,7 +238,17 @@ function renderHtmlCell(params, tab) {
   const title = ref ? `${text} ${ref}` : text;
   return (
     <Tooltip title={title} placement="top">
-      <span style={{ whiteSpace: 'normal', wordWrap: 'break-word' }} dangerouslySetInnerHTML={{ __html: params.value }} />
+      <span
+        style={{
+          whiteSpace: 'normal',
+          wordWrap: 'break-word',
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden'
+        }}
+        dangerouslySetInnerHTML={{ __html: params.value }}
+      />
     </Tooltip>
   );
 }
