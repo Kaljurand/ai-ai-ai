@@ -69,7 +69,7 @@ describe('App.jsx compilation', () => {
   });
   it('uses pending rows', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
-    expect(code.includes('pending: !mockMode')).toBe(true);
+    expect(code.includes('pending: true')).toBe(true);
   });
   it('uses draggable dialog and cell click handler', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');

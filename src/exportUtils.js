@@ -1,25 +1,44 @@
+const getFields = columns => columns.filter(c => c.field !== 'actions');
+
 export function rowsToJSON(rows, columns) {
-  const fields = columns.filter(c => c.field !== 'actions');
+  const fields = getFields(columns);
   const data = rows.map(r => {
     const obj = {};
-    for (const c of fields) obj[c.field] = r[c.field];
+    fields.forEach(c => {
+      obj[c.field] = r[c.field];
+    });
     return obj;
   });
   return JSON.stringify(data, null, 2);
 }
 
-export function rowsToCSV(rows, columns) {
-  const fields = columns.filter(c => c.field !== 'actions');
-  const header = fields.map(f => f.headerName || f.field).join(',');
-  const lines = rows.map(r => fields.map(f => {
-    const val = r[f.field] == null ? '' : String(r[f.field]).replace(/"/g, '""');
-    return `"${val}"`;
-  }).join(',')).join('\n');
+function rowsToDelimited(rows, columns, sep, quote = true) {
+  const fields = getFields(columns);
+  const header = fields.map(f => f.headerName || f.field).join(sep);
+  const lines = rows
+    .map(r =>
+      fields
+        .map(f => {
+          let val = r[f.field] == null ? '' : String(r[f.field]);
+          if (quote) val = val.replace(/"/g, '""');
+          return quote ? `"${val}"` : val;
+        })
+        .join(sep)
+    )
+    .join('\n');
   return header + '\n' + lines;
 }
 
+export function rowsToCSV(rows, columns) {
+  return rowsToDelimited(rows, columns, ',');
+}
+
+export function rowsToTSV(rows, columns) {
+  return rowsToDelimited(rows, columns, '\t', false);
+}
+
 export function rowsToMarkdown(rows, columns) {
-  const fields = columns.filter(c => c.field !== 'actions');
+  const fields = getFields(columns);
   const header = '|' + fields.map(f => f.headerName || f.field).join('|') + '|';
   const separator = '|' + fields.map(() => '---').join('|') + '|';
   const lines = rows.map(r => '|' + fields.map(f => String(r[f.field] ?? '').replace(/\|/g, '\\|')).join('|') + '|').join('\n');
@@ -27,7 +46,7 @@ export function rowsToMarkdown(rows, columns) {
 }
 
 export function rowsToYAML(rows, columns) {
-  const fields = columns.filter(c => c.field !== 'actions');
+  const fields = getFields(columns);
   return rows
     .map(r =>
       '-\n' +

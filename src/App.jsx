@@ -40,7 +40,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import Draggable from 'react-draggable';
 import Paper from '@mui/material/Paper';
 import { DataGrid } from '@mui/x-data-grid';
-import { rowsToJSON, rowsToYAML, rowsToMarkdown, download } from './exportUtils';
+import { rowsToJSON, rowsToCSV, rowsToTSV, rowsToYAML, rowsToMarkdown, download } from './exportUtils';
 import { expandRefs } from './referenceUtils';
 import { marked } from 'marked';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -49,6 +49,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import DotSpinner from './DotSpinner';
 
+import useStoredState from "./useStoredState";
 function PaperComponent(props) {
   return (
     <Draggable cancel={'[class*="MuiDialogContent-root"]'} handle="#draggable-dialog-title">
@@ -57,45 +58,6 @@ function PaperComponent(props) {
   );
 }
 
-function useStoredState(key, initial) {
-  const [state, setState] = useState(() => {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : initial;
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(state));
-    } catch (e) {
-      window.dispatchEvent(new CustomEvent('storageError', { detail: { key, error: e } }));
-    }
-  }, [key, state]);
-  return [state, setState];
-}
-
-function makeLongMockText(index) {
-  const num = Math.floor(Math.random() * 100);
-  return `Näidis pikem tekst ${index} sisaldab mitut lauset ja juhusliku numbri ${num}. ` +
-    'Teine lause venitab kasutajaliidese paigutust ning kontrollib komade ja lühendite lk kasutamist. ' +
-    'Kolmas lause lisab keerukama sõna nagu õunaaed ja muudab teksti mitmekesiseks.';
-}
-
-function makeMockTranscription(text) {
-  const words = text.split(/\s+/);
-  const out = [];
-  for (const w of words) {
-    const r = Math.random();
-    if (r < 0.1) continue; // drop word
-    let word = w;
-    if (r >= 0.1 && r < 0.2) {
-      const idx = Math.floor(Math.random() * w.length);
-      const ch = String.fromCharCode(97 + Math.floor(Math.random() * 26));
-      word = w.slice(0, idx) + ch + w.slice(idx + 1);
-    }
-    out.push(word);
-    if (r >= 0.2 && r < 0.3) out.push('ja');
-  }
-  return out.join(' ');
-}
 
 function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
   const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
@@ -315,6 +277,22 @@ function ExportButtons({ rows, columns, name, t, children }) {
         </MenuItem>
         <MenuItem
           onClick={() => {
+            download(rowsToCSV(rows, columns), 'text/csv', `${name}.csv`);
+            setAnchor(null);
+          }}
+        >
+          {t('exportCSV')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            download(rowsToTSV(rows, columns), 'text/tab-separated-values', `${name}.tsv`);
+            setAnchor(null);
+          }}
+        >
+          {t('exportTSV')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
             download(rowsToMarkdown(rows, columns), 'text/markdown', `${name}.md`);
             setAnchor(null);
           }}
@@ -372,6 +350,8 @@ const translations = {
     exportJSON: 'JSON',
     exportYAML: 'YAML',
     exportMD: 'Markdown',
+    exportCSV: 'CSV',
+    exportTSV: 'TSV',
     clearData: 'Clear Data',
     clearKeys: 'Clear Keys',
     resetUi: 'Reset UI state',
@@ -384,7 +364,6 @@ const translations = {
     mistralKey: 'Mistral API key',
     language: 'Language',
     darkMode: 'Dark mode',
-    mockMode: 'Mock mode active: no API key',
     preview: 'Preview',
     showSelected: 'Show selected only',
     selectedModels: 'Models',
@@ -442,6 +421,8 @@ const translations = {
     exportJSON: 'JSON',
     exportYAML: 'YAML',
     exportMD: 'Markdown',
+    exportCSV: 'CSV',
+    exportTSV: 'TSV',
     clearData: 'Puhasta andmed',
     clearKeys: 'Puhasta võtmid',
     resetUi: 'Taasta liidese olek',
@@ -454,7 +435,6 @@ const translations = {
     mistralKey: 'Mistral API v\u00f5ti',
     language: 'Keel',
     darkMode: 'Tume re\u017eiim',
-    mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaade',
     showSelected: 'Ainult valitud',
     selectedModels: 'Mudelid',
@@ -512,6 +492,8 @@ const translations = {
     exportJSON: 'JSON',
     exportYAML: 'YAML',
     exportMD: 'Markdown',
+    exportCSV: 'CSV',
+    exportTSV: 'TSV',
     clearData: 'Puhasta andmed',
     clearKeys: 'Puhasta võtmid',
     resetUi: 'Taasta liidese olõk',
@@ -521,7 +503,6 @@ const translations = {
     mistralKey: 'Mistral API v\u00f5ti',
     language: 'Kiil',
     darkMode: 'Tummas re\u017eiim',
-    mockMode: 'Moki re\u017eiim: API v\u00f5ti puudub',
     preview: 'Eelvaot\u00f5',
     showSelected: 'Ainult valitud',
     selectedModels: 'Mudelid',
@@ -724,7 +705,6 @@ export default function App({ darkMode, setDarkMode }) {
     a.src = url;
   });
 
-  const mockMode = !apiKeys.openai && !apiKeys.google && !apiKeys.openrouter && !apiKeys.mistral;
 
   useEffect(() => {
     (async () => {
@@ -864,13 +844,8 @@ export default function App({ darkMode, setDarkMode }) {
       let rowIndex;
       setTexts(t => {
         rowIndex = t.length;
-        return [...t, { provider: model, text: '', prompt: textPrompt, timestamp, pending: !mockMode }];
+        return [...t, { provider: model, text: '', prompt: textPrompt, timestamp, pending: true }];
       });
-      if (mockMode) {
-        const mock = makeLongMockText(rowIndex + 1);
-        setTexts(t => t.map((v, i) => i === rowIndex ? { ...v, text: mock, pending: false } : v));
-        continue;
-      }
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const body = { model: orModel, messages: [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }] };
@@ -970,16 +945,9 @@ export default function App({ darkMode, setDarkMode }) {
       let rowIndex;
       setAudios(a => {
         rowIndex = a.length;
-        return [...a, { index: idx, provider: model, prompt: fullPrompt, timestamp, pending: !mockMode }];
+        return [...a, { index: idx, provider: model, prompt: fullPrompt, timestamp, pending: true }];
       });
-      if (mockMode) {
-        const log = startLog('TTS', model, fullPrompt, model, cost);
-        const blob = new Blob([fullPrompt], { type: 'audio/plain' });
-        const data = await blobToDataUrl(blob);
-        const duration = await audioDuration(data);
-        setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
-        finishLog(log, '<audio>', cost);
-      } else if (openRouterMap[model]) {
+      if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const url = 'https://openrouter.ai/api/v1/audio/speech';
         const body = {
@@ -1057,13 +1025,8 @@ export default function App({ darkMode, setDarkMode }) {
       };
       setTranscripts(t => {
         rowIndex = t.length;
-        return [...t, { aIndex, provider: model, text: '', prompt: asrPrompt, timestamp: new Date().toISOString(), pending: !mockMode }];
+        return [...t, { aIndex, provider: model, text: '', prompt: asrPrompt, timestamp: new Date().toISOString(), pending: true }];
       });
-      if (mockMode) {
-        const text = makeMockTranscription(texts[audio.index]?.text || '');
-        finish(text, 'mock');
-        continue;
-      }
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const form = new FormData();
@@ -1787,7 +1750,6 @@ export default function App({ darkMode, setDarkMode }) {
             <MenuItem value="et">Eesti</MenuItem>
             <MenuItem value="vro">V\u00f5ro</MenuItem>
           </Select>
-          {mockMode && <Typography color="error">{t('mockMode')}</Typography>}
           <Divider textAlign="left" sx={{ my: 2 }}>{t('storageGroup')}</Divider>
           <Box>
             <Button size="small" onClick={clearTables}>{t('clearData')}</Button>
