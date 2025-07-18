@@ -122,4 +122,9 @@ describe('App.jsx compilation', () => {
     expect(code.includes('predefinedAsrPrompts')).toBe(true);
     expect(code.includes('Summarize the transcription in 140 characters.')).toBe(true);
   });
+  it('clamps table cell text to three lines', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('WebkitLineClamp: 3')).toBe(true);
+    expect(code.includes("val.slice(0, 25)")).toBe(false);
+  });
 });
