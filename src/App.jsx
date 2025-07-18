@@ -356,6 +356,7 @@ const translations = {
     audio: 'Audio',
     actions: 'Actions',
     toAsr: 'To ASR',
+    generateTranscript: 'Generate Transcript',
     asrPromptLabel: 'ASR Prompt',
     transcriptId: 'ID',
     originalText: 'Original Text',
@@ -424,6 +425,7 @@ const translations = {
     audio: 'Heli',
     actions: 'Tegevused',
     toAsr: 'Saada ASR-i',
+    generateTranscript: 'Genereeri transkript',
     asrPromptLabel: 'ASR-prompt',
     transcriptId: 'ID',
     originalText: 'Algtekst',
@@ -492,6 +494,7 @@ const translations = {
     audio: 'H\u00e4\u00e4l',
     actions: 'Tegemised',
     toAsr: 'Saada ASR-i',
+    generateTranscript: 'Genereeri transkript',
     asrPromptLabel: 'ASR-prompt',
     transcriptId: 'ID',
     originalText: 'Algtekst',
@@ -556,6 +559,7 @@ export default function App({ darkMode, setDarkMode }) {
   const [textPrompt, setTextPrompt] = useStoredState('textPrompt', 'Generate a realistic Estonian weather report');
   const [selectedTextModels, setSelectedTextModels] = useStoredState('selectedTextModels', []);
   const [selectedTextId, setSelectedTextId] = useState(null);
+  const [selectedAudioId, setSelectedAudioId] = useState(null);
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
   const [demoPrompt, setDemoPrompt] = useState('');
@@ -619,6 +623,12 @@ export default function App({ darkMode, setDarkMode }) {
   useEffect(() => {
     if (selectedTextId === null && texts.length) setSelectedTextId(0);
   }, [texts]);
+
+  useEffect(() => {
+    if (selectedAudioId !== null && selectedAudioId >= audios.length) {
+      setSelectedAudioId(null);
+    }
+  }, [audios]);
 
   const textModelsList = [
     ...openRouterModels
@@ -1122,6 +1132,11 @@ export default function App({ darkMode, setDarkMode }) {
     setStatus('');
   };
 
+  const generateTranscripts = () => {
+    if (selectedAudioId == null) return;
+    transcribe(selectedAudioId);
+  };
+
   const deleteAudio = (aIndex) => {
     setAudios(a => a.filter((_, i) => i !== aIndex));
     setTranscripts(t => t.flatMap(tr => {
@@ -1129,6 +1144,8 @@ export default function App({ darkMode, setDarkMode }) {
       if (tr.aIndex > aIndex) return [{ ...tr, aIndex: tr.aIndex - 1 }];
       return [tr];
     }));
+    if (selectedAudioId === aIndex) setSelectedAudioId(null);
+    else if (selectedAudioId > aIndex) setSelectedAudioId(selectedAudioId - 1);
   };
 
   const deleteText = (index) => {
@@ -1151,6 +1168,11 @@ export default function App({ darkMode, setDarkMode }) {
     setTexts(t => t.filter((_, i) => i !== index));
     if (selectedTextId === index) setSelectedTextId(null);
     else if (selectedTextId > index) setSelectedTextId(selectedTextId - 1);
+    if (selectedAudioId != null) {
+      const mapped = map[selectedAudioId];
+      if (mapped == null) setSelectedAudioId(null);
+      else setSelectedAudioId(mapped);
+    }
   };
 
   const deleteTranscript = (tIndex) => {
@@ -1259,7 +1281,7 @@ export default function App({ darkMode, setDarkMode }) {
       renderCell: params => (
         <>
           <Tooltip title={t('toAsr')}>
-            <IconButton onClick={e => { e.stopPropagation(); transcribe(params.row._index); }} size="small">
+            <IconButton onClick={e => { e.stopPropagation(); setSelectedAudioId(params.row._index); setView('asr'); }} size="small">
               <ArrowForwardIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -1637,6 +1659,18 @@ export default function App({ darkMode, setDarkMode }) {
                 )
               }}
             />
+          </Tooltip>
+          {selectedAudioId != null && audios[selectedAudioId] && (
+            <audio controls src={audios[selectedAudioId].url} style={{ width: '100%', marginTop: '0.5rem' }} />
+          )}
+          <Tooltip
+            title={selectedAsrModels.length
+              ? `${t('generateTranscript')} (${selectedAsrModels.join(', ')})`
+              : t('generateTranscript')}
+          >
+            <Button size="small" variant="contained" onClick={generateTranscripts} sx={{ mt: 1 }}>
+              {t('generateTranscript')}
+            </Button>
           </Tooltip>
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={resultRows} columns={resultColumns} name="results" t={t} />
