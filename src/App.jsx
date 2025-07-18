@@ -25,6 +25,7 @@ import {
   DialogContent,
   DialogActions,
   InputAdornment,
+  Link,
   FormGroup,
   Menu,
 } from '@mui/material';
@@ -362,6 +363,10 @@ const translations = {
     googleKey: 'Google API key',
     openrouterKey: 'OpenRouter API key',
     mistralKey: 'Mistral API key',
+    openaiKeyUrl: 'https://platform.openai.com/api-keys',
+    googleKeyUrl: 'https://console.cloud.google.com/apis/credentials',
+    openrouterKeyUrl: 'https://openrouter.ai/keys',
+    mistralKeyUrl: 'https://console.mistral.ai/api-keys',
     language: 'Language',
     darkMode: 'Dark mode',
     preview: 'Preview',
@@ -433,6 +438,10 @@ const translations = {
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
     mistralKey: 'Mistral API v\u00f5ti',
+    openaiKeyUrl: 'https://platform.openai.com/api-keys',
+    googleKeyUrl: 'https://console.cloud.google.com/apis/credentials',
+    openrouterKeyUrl: 'https://openrouter.ai/keys',
+    mistralKeyUrl: 'https://console.mistral.ai/api-keys',
     language: 'Keel',
     darkMode: 'Tume re\u017eiim',
     preview: 'Eelvaade',
@@ -501,6 +510,10 @@ const translations = {
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
     mistralKey: 'Mistral API v\u00f5ti',
+    openaiKeyUrl: 'https://platform.openai.com/api-keys',
+    googleKeyUrl: 'https://console.cloud.google.com/apis/credentials',
+    openrouterKeyUrl: 'https://openrouter.ai/keys',
+    mistralKeyUrl: 'https://console.mistral.ai/api-keys',
     language: 'Kiil',
     darkMode: 'Tummas re\u017eiim',
     preview: 'Eelvaot\u00f5',
@@ -1719,6 +1732,11 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             margin="normal"
           />
+          <Typography variant="caption" sx={{ ml: 1 }}>
+            <Link href={t('openaiKeyUrl')} target="_blank" rel="noopener">
+              {t('openaiKeyUrl')}
+            </Link>
+          </Typography>
           <TextField
             label={t('googleKey')}
             type="password"
@@ -1727,6 +1745,11 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             margin="normal"
           />
+          <Typography variant="caption" sx={{ ml: 1 }}>
+            <Link href={t('googleKeyUrl')} target="_blank" rel="noopener">
+              {t('googleKeyUrl')}
+            </Link>
+          </Typography>
           <TextField
             label={t('openrouterKey')}
             type="password"
@@ -1735,6 +1758,11 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             margin="normal"
           />
+          <Typography variant="caption" sx={{ ml: 1 }}>
+            <Link href={t('openrouterKeyUrl')} target="_blank" rel="noopener">
+              {t('openrouterKeyUrl')}
+            </Link>
+          </Typography>
           <TextField
             label={t('mistralKey')}
             type="password"
@@ -1743,6 +1771,11 @@ export default function App({ darkMode, setDarkMode }) {
             fullWidth
             margin="normal"
           />
+          <Typography variant="caption" sx={{ ml: 1 }}>
+            <Link href={t('mistralKeyUrl')} target="_blank" rel="noopener">
+              {t('mistralKeyUrl')}
+            </Link>
+          </Typography>
           <Divider textAlign="left" sx={{ my: 2 }}>{t('uiGroup')}</Divider>
           <FormControlLabel
             control={<Switch checked={darkMode} onChange={e => setDarkMode(e.target.checked)} />}
