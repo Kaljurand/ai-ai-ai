@@ -102,4 +102,12 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes("closest('input[type=\"checkbox\"]')")).toBe(true);
   });
+  it('includes generateTranscript translation', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('generateTranscript')).toBe(true);
+  });
+  it('shows ASR generate tooltip with models', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(/Tooltip\s*\n\s*title={selectedAsrModels.length/.test(code)).toBe(true);
+  });
 });
