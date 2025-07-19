@@ -120,7 +120,7 @@ describe('App.jsx compilation', () => {
   it('contains ASR example prompts', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('predefinedAsrPrompts')).toBe(true);
-    expect(code.includes('Summarize the transcription in 140 characters.')).toBe(true);
+    expect(code.includes('Assume the following audio was spoken by a non-native speaker.')).toBe(true);
   });
   it('clamps table cell text to three lines', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
