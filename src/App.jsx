@@ -395,12 +395,12 @@ const translations = {
     selectedModels: 'Models',
     storageFailed: 'Not stored',
     priceModel: 'Model',
-    pricePerM: 'USD per 1M tokens',
+    pricePerM: 'USD / 1 M tokens',
     modelId: 'ID',
     modelName: 'Name',
     modelDesc: 'Description',
     modality: 'Modality',
-    pricing: 'USD / 1M tokens',
+    pricing: 'USD / 1 M tokens',
     duration: 'Duration',
     logSize: 'Log rows',
     storageUsage: 'Storage used'
@@ -472,12 +472,12 @@ const translations = {
     selectedModels: 'Mudelid',
     storageFailed: 'Salvestus eba\u00f5nnestus',
     priceModel: 'Mudel',
-    pricePerM: 'USD 1M tokeni kohta',
+    pricePerM: 'USD / 1 M tokeni kohta',
     modelId: 'ID',
     modelName: 'Nimi',
     modelDesc: 'Kirjeldus',
     modality: 'Modaliteet',
-    pricing: 'USD / 1M tokeni kohta',
+    pricing: 'USD / 1 M tokeni kohta',
     duration: 'Kestus',
     logSize: 'Logi ridade arv',
     storageUsage: 'Kasutatud salvestus'
@@ -547,12 +547,12 @@ const translations = {
     storageGroup: 'Salvestus',
     storageFailed: 'Salvestus epa\u00f5nnestus',
     priceModel: 'Mudel',
-    pricePerM: 'USD 1M tokeni p\u00e4\u00e4le',
+    pricePerM: 'USD / 1 M tokeni p\u00e4\u00e4le',
     modelId: 'ID',
     modelName: 'Nimi',
     modelDesc: 'Kirjeldus',
     modality: 'Modaliteet',
-    pricing: 'USD / 1M tokeni pääle',
+    pricing: 'USD / 1 M tokeni pääle',
     duration: 'Kestus',
     logSize: 'Logi ridadõ arv',
     storageUsage: 'Kasutatu salvestus'
@@ -810,7 +810,12 @@ export default function App({ darkMode, setDarkMode }) {
           const map = {};
           models.forEach(m => { map[m.base] = m; });
           setOpenRouterMap(map);
-          const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({ id: m.base, name: m.id, cost: m.pricing?.prompt || '', provider: 'openrouter' }));
+          const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({
+            id: m.base,
+            name: m.id,
+            cost: m.pricing?.prompt ? parseFloat(m.pricing.prompt) / 1e6 : '',
+            provider: 'openrouter'
+          }));
           if (tts.length) {
             setTtsModels(t => [...t.filter(x => !tts.some(v => v.id === x.id)), ...tts]);
             if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
@@ -1420,8 +1425,8 @@ export default function App({ darkMode, setDarkMode }) {
       map[m.id] = row;
     });
     openRouterModels.forEach(m => {
-      const prompt = parseFloat(m.pricing?.prompt || 0);
-      const completion = parseFloat(m.pricing?.completion || 0);
+      const prompt = parseFloat(m.pricing?.prompt || 0) / 1e6;
+      const completion = parseFloat(m.pricing?.completion || 0) / 1e6;
       const pricing = prompt + completion;
       const id = m.id.split('/').pop();
       const row = map[id] || { id, provider: 'openrouter', name: m.name };
@@ -1456,7 +1461,7 @@ export default function App({ darkMode, setDarkMode }) {
     { field: 'name', headerName: t('modelName'), width: 200, renderCell: p => renderCell(p, 'tab_models') },
     { field: 'description', headerName: t('modelDesc'), flex: 1, renderCell: p => renderCell(p, 'tab_models') },
     { field: 'modality', headerName: t('modality'), width: 120, renderCell: p => renderCell(p, 'tab_models') },
-    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell: p => renderCell(p, 'tab_models') },
+    { field: 'pricing', headerName: t('pricing'), width: 150, type: 'number', renderCell: p => renderCell(p, 'tab_models') },
     { field: 'text', headerName: t('tabText'), width: 80, sortable: false, filterable: false,
       renderCell: params => (
         <Checkbox size="small" checked={selectedTextModels.includes(params.row.id)} onChange={e => {
