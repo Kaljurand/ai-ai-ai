@@ -27,4 +27,14 @@ describe('transcriptsToRows', () => {
     expect(rows[0].pending).toBe(true);
     expect(rows[0].wer).toBe('');
   });
+
+  it('ignores TTS instructions when computing WER', () => {
+    const texts = [{ text: 'hello there', instructions: 'fast', provider: 'tts' }];
+    const audios = [{ index: 0, provider: 'tts' }];
+    const transcripts = [
+      { aIndex: 0, provider: 'mock', text: 'hello there' }
+    ];
+    const rows = transcriptsToRows(transcripts, audios, texts);
+    expect(rows[0].wer).toBe('0.00');
+  });
 });
