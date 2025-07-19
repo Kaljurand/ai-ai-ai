@@ -1028,13 +1028,13 @@ export default function App({ darkMode, setDarkMode }) {
     const idx = texts.length;
     const timestamp = new Date().toISOString();
     const fullPrompt = `${ttsMetaPrompt} ${ttsPrompt}`;
-    setTexts([...texts, { provider: 'tts', text: fullPrompt }]);
+    setTexts([...texts, { provider: 'tts', text: ttsPrompt, instructions: ttsMetaPrompt }]);
     for (const model of selectedTtsModels) {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
       let rowIndex;
       setAudios(a => {
         rowIndex = a.length;
-        return [...a, { index: idx, provider: model, prompt: fullPrompt, timestamp, pending: true }];
+        return [...a, { index: idx, provider: model, prompt: ttsPrompt, instructions: ttsMetaPrompt, timestamp, pending: true }];
       });
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
