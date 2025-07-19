@@ -813,7 +813,7 @@ export default function App({ darkMode, setDarkMode }) {
           const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({
             id: m.base,
             name: m.id,
-            cost: m.pricing?.prompt ? parseFloat(m.pricing.prompt) / 1e6 : '',
+            cost: m.pricing?.prompt ? parseFloat(m.pricing.prompt) * 1e6 : '',
             provider: 'openrouter'
           }));
           if (tts.length) {
@@ -1425,8 +1425,8 @@ export default function App({ darkMode, setDarkMode }) {
       map[m.id] = row;
     });
     openRouterModels.forEach(m => {
-      const prompt = parseFloat(m.pricing?.prompt || 0) / 1e6;
-      const completion = parseFloat(m.pricing?.completion || 0) / 1e6;
+      const prompt = parseFloat(m.pricing?.prompt || 0) * 1e6;
+      const completion = parseFloat(m.pricing?.completion || 0) * 1e6;
       const pricing = prompt + completion;
       const id = m.id.split('/').pop();
       const row = map[id] || { id, provider: 'openrouter', name: m.name };

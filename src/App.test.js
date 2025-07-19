@@ -136,4 +136,8 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('localStorage.length')).toBe(true);
   });
+  it('includes pricing per million translation', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('USD / 1 M tokens')).toBe(true);
+  });
 });
