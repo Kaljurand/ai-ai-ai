@@ -218,8 +218,12 @@ function renderCell(params, tab) {
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden'
   };
-  if (['timestamp', 'time', 'provider', 'textSource', 'audioSource', 'asrSource', 'wer'].includes(params.field)) {
+  if (['timestamp', 'time', 'provider', 'textSource', 'audioSource', 'asrSource', 'wer', 'pricing', 'cost'].includes(params.field)) {
     style.fontFamily = 'monospace';
+    style.textAlign = 'right';
+    if (['pricing', 'cost'].includes(params.field) && val !== '' && !isNaN(val)) {
+      val = Number(val).toFixed(5);
+    }
   }
   const id = params.row.id != null ? params.row.id + 1 : (params.row.i ?? params.row.index ?? '');
   const ref = tab && id !== '' ? `{{${tab}.table.${id}.${params.field}}}` : '';
@@ -813,7 +817,7 @@ export default function App({ darkMode, setDarkMode }) {
           const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({
             id: m.base,
             name: m.id,
-            cost: m.pricing?.prompt ? parseFloat(m.pricing.prompt) * 1e6 : '',
+            cost: m.pricing?.prompt ? Number((parseFloat(m.pricing.prompt) / 1e6).toFixed(5)) : '',
             provider: 'openrouter'
           }));
           if (tts.length) {
@@ -1393,7 +1397,7 @@ export default function App({ darkMode, setDarkMode }) {
     { field: 'url', headerName: 'Endpoint', flex: 1, renderCell: p => renderCell(p, 'tab_log') },
     { field: 'body', headerName: 'Body', flex: 1, renderCell: p => renderCell(p, 'tab_log') },
     { field: 'response', headerName: 'Response', flex: 1, renderCell: p => renderProgressCell(p, 'tab_log') },
-    { field: 'cost', headerName: 'Cost', width: 100, renderCell: p => renderProgressCell(p, 'tab_log') },
+    { field: 'cost', headerName: 'Cost', width: 100, type: 'number', renderCell: p => renderProgressCell(p, 'tab_log') },
     { field: 'duration', headerName: t('duration'), width: 100, renderCell: p => renderProgressCell(p, 'tab_log') },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 120,
@@ -1425,9 +1429,9 @@ export default function App({ darkMode, setDarkMode }) {
       map[m.id] = row;
     });
     openRouterModels.forEach(m => {
-      const prompt = parseFloat(m.pricing?.prompt || 0) * 1e6;
-      const completion = parseFloat(m.pricing?.completion || 0) * 1e6;
-      const pricing = prompt + completion;
+      const prompt = parseFloat(m.pricing?.prompt || 0) / 1e6;
+      const completion = parseFloat(m.pricing?.completion || 0) / 1e6;
+      const pricing = Number((prompt + completion).toFixed(5));
       const id = m.id.split('/').pop();
       const row = map[id] || { id, provider: 'openrouter', name: m.name };
       row.modelId = m.id;
