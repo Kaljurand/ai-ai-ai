@@ -400,7 +400,7 @@ const translations = {
     modelName: 'Name',
     modelDesc: 'Description',
     modality: 'Modality',
-    pricing: 'Pricing',
+    pricing: 'USD / 1M tokens',
     duration: 'Duration',
     logSize: 'Log rows',
     storageUsage: 'Storage used'
@@ -477,7 +477,7 @@ const translations = {
     modelName: 'Nimi',
     modelDesc: 'Kirjeldus',
     modality: 'Modaliteet',
-    pricing: 'Hind',
+    pricing: 'USD / 1M tokeni kohta',
     duration: 'Kestus',
     logSize: 'Logi ridade arv',
     storageUsage: 'Kasutatud salvestus'
@@ -552,7 +552,7 @@ const translations = {
     modelName: 'Nimi',
     modelDesc: 'Kirjeldus',
     modality: 'Modaliteet',
-    pricing: 'Hind',
+    pricing: 'USD / 1M tokeni pääle',
     duration: 'Kestus',
     logSize: 'Logi ridadõ arv',
     storageUsage: 'Kasutatu salvestus'
