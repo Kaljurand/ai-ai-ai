@@ -36,6 +36,7 @@ npm test
 - Users can add their own texts, edit generated ones and upload audio files.
 - Export results as JSON, YAML or Markdown and clear all stored data.
 - Results are persisted in browser local storage.
+- The number of log entries kept can be adjusted and current storage usage is shown in the Settings tab.
 - Browse OpenRouter models in a dedicated tab. The table shows the sum of
   prompt and completion pricing for each model.
 - Click any table cell (except checkboxes) to view a Markdown preview of its contents.

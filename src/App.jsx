@@ -670,11 +670,7 @@ export default function App({ darkMode, setDarkMode }) {
   }, [audios]);
 
   useEffect(() => {
-    if (navigator.storage && navigator.storage.estimate) {
-      navigator.storage.estimate().then(res => {
-        if (res) setStorageInfo(res);
-      });
-    }
+    updateStorageInfo();
   }, [texts, audios, transcripts, logs]);
 
   const textModelsList = [
@@ -712,9 +708,32 @@ export default function App({ darkMode, setDarkMode }) {
         if (typeof val === 'string' && val.length > 50) out[k] = val.slice(0, 50) + '...';
         else out[k] = val;
       }
-      return JSON.stringify(out);
+      let str = JSON.stringify(out);
+      if (str.length > 1000) str = str.slice(0, 1000) + '...';
+      return str;
     }
     return String(v);
+  };
+
+  const updateStorageInfo = async () => {
+    let info = { usage: 0, quota: 0 };
+    if (navigator.storage?.estimate) {
+      try {
+        const res = await navigator.storage.estimate();
+        if (res) info = res;
+      } catch {}
+    }
+    if (!info.quota) info.quota = 5 * 1024 * 1024;
+    if (!info.usage) {
+      let size = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const val = localStorage.getItem(key) || '';
+        size += (key.length + val.length) * 2;
+      }
+      info.usage = size;
+    }
+    setStorageInfo(info);
   };
 
   const startLog = (method, url, body = '', model = '', cost = '') => {
