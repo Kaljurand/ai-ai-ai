@@ -132,4 +132,8 @@ describe('App.jsx compilation', () => {
     expect(code.includes('logSize')).toBe(true);
     expect(code.includes('storageUsage')).toBe(true);
   });
+  it('calculates local storage usage', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('localStorage.length')).toBe(true);
+  });
 });
