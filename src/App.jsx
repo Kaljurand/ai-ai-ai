@@ -401,7 +401,9 @@ const translations = {
     modelDesc: 'Description',
     modality: 'Modality',
     pricing: 'Pricing',
-    duration: 'Duration'
+    duration: 'Duration',
+    logSize: 'Log rows',
+    storageUsage: 'Storage used'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -477,6 +479,8 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
+    logSize: 'Logi ridade arv',
+    storageUsage: 'Kasutatud salvestus'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -550,6 +554,8 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
+    logSize: 'Logi ridadõ arv',
+    storageUsage: 'Kasutatu salvestus'
   }
 };
 
@@ -599,6 +605,8 @@ export default function App({ darkMode, setDarkMode }) {
   const [loadingCount, setLoadingCount] = useState(0);
   const [errors, setErrors] = useState([]);
   const [logs, setLogs] = useStoredState('logs', []);
+  const [logSize, setLogSize] = useStoredState('logSize', 100);
+  const [storageInfo, setStorageInfo] = useState({ usage: 0, quota: 0 });
 
   const predefinedPrompts = [
     'write an Estonian haiku in the style of Jaan Pehk',
@@ -642,6 +650,10 @@ export default function App({ darkMode, setDarkMode }) {
   }, []);
 
   useEffect(() => {
+    setLogs(l => l.slice(-logSize));
+  }, [logSize]);
+
+  useEffect(() => {
     if (ttsModels.length && !selectedTtsModels.length) {
       setSelectedTtsModels([ttsModels[0].id]);
     }
@@ -656,6 +668,14 @@ export default function App({ darkMode, setDarkMode }) {
       setSelectedAudioId(null);
     }
   }, [audios]);
+
+  useEffect(() => {
+    if (navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then(res => {
+        if (res) setStorageInfo(res);
+      });
+    }
+  }, [texts, audios, transcripts, logs]);
 
   const textModelsList = [
     ...openRouterModels
@@ -681,6 +701,7 @@ export default function App({ darkMode, setDarkMode }) {
   };
 
   const logIdRef = React.useRef(0);
+  const fmtBytes = b => (b / 1048576).toFixed(1) + ' MB';
   const truncate = v => {
     if (typeof v === 'string') {
       try { v = JSON.parse(v); } catch { return v.length > 50 ? v.slice(0, 25) + '...' + v.slice(-20) : v; }
@@ -700,7 +721,10 @@ export default function App({ darkMode, setDarkMode }) {
     const id = logIdRef.current++;
     const entry = { id, time: new Date().toISOString(), method, url, body: truncate(body), model, cost, pending: true };
     const start = Date.now();
-    setLogs(l => [...l, entry]);
+    setLogs(l => {
+      const updated = [...l, entry];
+      return updated.slice(-logSize);
+    });
     return { id, start };
   };
 
@@ -1809,6 +1833,19 @@ export default function App({ darkMode, setDarkMode }) {
             <MenuItem value="vro">V\u00f5ro</MenuItem>
           </Select>
           <Divider textAlign="left" sx={{ my: 2 }}>{t('storageGroup')}</Divider>
+          <Box sx={{ mb: 1 }}>
+            <TextField
+              label={t('logSize')}
+              type="number"
+              size="small"
+              value={logSize}
+              onChange={e => setLogSize(parseInt(e.target.value || 0))}
+              sx={{ width: 120, mr: 2 }}
+            />
+            <Typography variant="body2" sx={{ mt: 2 }}>
+              {t('storageUsage')}: {fmtBytes(storageInfo.usage)} / {fmtBytes(storageInfo.quota)}
+            </Typography>
+          </Box>
           <Box>
             <Button size="small" onClick={clearTables}>{t('clearData')}</Button>
             <Button size="small" onClick={clearKeys} sx={{ ml: 1 }}>{t('clearKeys')}</Button>

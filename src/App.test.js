@@ -127,4 +127,9 @@ describe('App.jsx compilation', () => {
     expect(code.includes('WebkitLineClamp: 3')).toBe(true);
     expect(code.includes("val.slice(0, 25)")).toBe(false);
   });
+  it('includes log size and storage usage translations', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('logSize')).toBe(true);
+    expect(code.includes('storageUsage')).toBe(true);
+  });
 });
