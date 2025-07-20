@@ -1301,7 +1301,13 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const audioRows = audios.map((a, i) => ({ id: i, ...a, text: texts[a.index]?.text || '', _index: i }));
+  const audioRows = audios.map((a, i) => ({
+    id: i,
+    ...a,
+    format: a.format || formatFromDataUrl(a.url),
+    text: texts[a.index]?.text || '',
+    _index: i
+  }));
   const renderAudioActions = row => (
     <>
       <Tooltip title={t('toAsr')}>
@@ -1332,7 +1338,14 @@ export default function App({ darkMode, setDarkMode }) {
     { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell: p => renderCell(p, 'tab_audio') },
     { field: 'provider', headerName: t('source'), width: 120, renderCell: p => renderCell(p, 'tab_audio') },
     { field: 'text', headerName: t('text'), flex: 1, renderCell: p => renderCell(p, 'tab_audio') },
-    { field: 'duration', headerName: t('length'), width: 80, type: 'number', valueFormatter: p => p.value != null ? p.value.toFixed(1) : '', renderCell: p => renderCell(p, 'tab_audio') },
+    {
+      field: 'duration',
+      headerName: t('length'),
+      width: 80,
+      type: 'number',
+      valueFormatter: p => (p && p.value != null ? p.value.toFixed(1) : ''),
+      renderCell: p => renderCell(p, 'tab_audio')
+    },
     { field: 'format', headerName: t('format'), width: 90, renderCell: p => renderCell(p, 'tab_audio') },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 200,
