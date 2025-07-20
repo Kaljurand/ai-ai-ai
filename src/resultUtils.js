@@ -11,6 +11,7 @@ export function transcriptsToRows(transcripts, audios, texts) {
       i: i + 1,
       original: orig,
       transcription,
+      timestamp: t.timestamp,
       textSource: txt?.provider || '',
       audioSource: audio?.provider || '',
       asrSource: t.provider,
