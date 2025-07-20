@@ -941,12 +941,17 @@ export default function App({ darkMode, setDarkMode }) {
   const generateTexts = async () => {
     setStatus('Generating text...');
     const timestamp = new Date().toISOString();
-    for (const model of selectedTextModels) {
-      let rowIndex;
-      setTexts(t => {
-        rowIndex = t.length;
-        return [...t, { provider: model, text: '', prompt: textPrompt, timestamp, pending: true }];
-      });
+    const indices = [];
+    setTexts(t => {
+      const arr = [...t];
+      for (const model of selectedTextModels) {
+        indices.push(arr.length);
+        arr.push({ provider: model, text: '', prompt: textPrompt, timestamp, pending: true });
+      }
+      return arr;
+    });
+    const tasks = selectedTextModels.map((model, i) => (async () => {
+      const rowIndex = indices[i];
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
@@ -955,11 +960,11 @@ export default function App({ darkMode, setDarkMode }) {
           const data = await openRouterChat(orModel, body, apiKeys.openrouter, fetchWithLoading);
           finishLog(log, data);
           const text = data.choices?.[0]?.message?.content?.trim();
-          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+          if (text) setTexts(t => t.map((v,j)=>j===rowIndex?{ ...v, text, pending:false }:v));
         } catch (e) {
           finishLog(log, { error: e.message });
           showError(e.message);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setTexts(t => t.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
       } else if (googleModels.includes(model)) {
         const prompt = expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt });
@@ -968,11 +973,11 @@ export default function App({ darkMode, setDarkMode }) {
           const data = await googleGenerateText(model, prompt, apiKeys.google, fetchWithLoading);
           finishLog(log, data);
           const text = data.candidates?.[0]?.output?.trim();
-          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+          if (text) setTexts(t => t.map((v,j)=>j===rowIndex?{ ...v, text, pending:false }:v));
         } catch (e) {
           finishLog(log, { error: e.message });
           showError(e.message);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setTexts(t => t.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
       } else {
         const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
@@ -981,14 +986,15 @@ export default function App({ darkMode, setDarkMode }) {
           const data = await openAiChat(model, body, apiKeys.openai, fetchWithLoading);
           finishLog(log, data);
           const text = data.choices?.[0]?.message?.content?.trim();
-          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+          if (text) setTexts(t => t.map((v,j)=>j===rowIndex?{ ...v, text, pending:false }:v));
         } catch (e) {
           finishLog(log, { error: e.message });
           showError(e.message);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setTexts(t => t.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
       }
-    }
+    })());
+    await Promise.all(tasks);
     setStatus('');
   };
 
@@ -1033,13 +1039,18 @@ export default function App({ darkMode, setDarkMode }) {
     const timestamp = new Date().toISOString();
     const fullPrompt = `${ttsMetaPrompt} ${ttsPrompt}`;
     setTexts([...texts, { provider: 'tts', text: ttsPrompt, instructions: ttsMetaPrompt }]);
-    for (const model of selectedTtsModels) {
+    const indices = [];
+    setAudios(a => {
+      const arr = [...a];
+      for (const model of selectedTtsModels) {
+        indices.push(arr.length);
+        arr.push({ index: idx, provider: model, prompt: ttsPrompt, instructions: ttsMetaPrompt, timestamp, pending: true });
+      }
+      return arr;
+    });
+    const tasks = selectedTtsModels.map((model, i) => (async () => {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
-      let rowIndex;
-      setAudios(a => {
-        rowIndex = a.length;
-        return [...a, { index: idx, provider: model, prompt: ttsPrompt, instructions: ttsMetaPrompt, timestamp, pending: true }];
-      });
+      const rowIndex = indices[i];
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
@@ -1050,11 +1061,11 @@ export default function App({ darkMode, setDarkMode }) {
           finishLog(log, { model, data: '<bytes>' }, cost);
           const data = await blobToDataUrl(blob);
           const duration = await audioDuration(data);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+          setAudios(a => a.map((v,j)=>j===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
         } catch (e) {
           finishLog(log, { error: e.message }, cost);
           showError(e.message);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setAudios(a => a.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
       } else if (openAiModels.includes(model)) {
         const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
@@ -1065,21 +1076,22 @@ export default function App({ darkMode, setDarkMode }) {
           finishLog(log, { model, data: '<bytes>' }, cost);
           const data = await blobToDataUrl(blob);
           const duration = await audioDuration(data);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+          setAudios(a => a.map((v,j)=>j===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
         } catch (e) {
           finishLog(log, { error: e.message }, cost);
           showError(e.message);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setAudios(a => a.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
       } else {
         const log = startLog('TTS', model, fullPrompt, model, cost);
         const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
-        setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+        setAudios(a => a.map((v,j)=>j===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
         finishLog(log, { model, data: '<bytes>' }, cost);
       }
-    }
+    })());
+    await Promise.all(tasks);
   };
 
   const transcribe = async (aIndex) => {
@@ -1087,15 +1099,20 @@ export default function App({ darkMode, setDarkMode }) {
     if (!audio) return;
     setStatus('Transcribing...');
     const blob = dataUrlToBlob(audio.data || audio.url);
-    for (const model of selectedAsrModels) {
-      let rowIndex;
-      const finish = (text, provider) => {
-        setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+    const indices = [];
+    setTranscripts(t => {
+      const arr = [...t];
+      for (const model of selectedAsrModels) {
+        indices.push(arr.length);
+        arr.push({ aIndex, provider: model, text: '', prompt: asrPrompt, timestamp: new Date().toISOString(), pending: true });
+      }
+      return arr;
+    });
+    const tasks = selectedAsrModels.map((model, i) => (async () => {
+      const rowIndex = indices[i];
+      const finish = text => {
+        setTranscripts(t => t.map((v,j)=>j===rowIndex?{ ...v, text, pending:false }:v));
       };
-      setTranscripts(t => {
-        rowIndex = t.length;
-        return [...t, { aIndex, provider: model, text: '', prompt: asrPrompt, timestamp: new Date().toISOString(), pending: true }];
-      });
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
         const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
@@ -1104,10 +1121,10 @@ export default function App({ darkMode, setDarkMode }) {
           const data = await openRouterTranscribe(orModel, blob, prompt, apiKeys.openrouter, fetchWithLoading);
           finishLog(log, data);
           const text = data.text?.trim();
-          if (text) finish(text, model);
+          if (text) finish(text);
         } catch (e) {
           finishLog(log, { error: e.message });
-          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setTranscripts(t => t.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
           showError(e.message);
         }
       } else if (mistralModels.includes(model)) {
@@ -1117,10 +1134,10 @@ export default function App({ darkMode, setDarkMode }) {
           const data = await mistralTranscribe(model, blob, prompt, apiKeys.mistral, fetchWithLoading);
           finishLog(log, data);
           const text = data.text?.trim();
-          if (text) finish(text, model);
+          if (text) finish(text);
         } catch (e) {
           finishLog(log, { error: e.message });
-          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setTranscripts(t => t.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
           showError(e.message);
         }
       } else if (openAiModels.includes(model)) {
@@ -1130,20 +1147,21 @@ export default function App({ darkMode, setDarkMode }) {
           const data = await openAiTranscribe(model, blob, prompt, apiKeys.openai, fetchWithLoading);
           finishLog(log, data);
           const text = data.text?.trim();
-          if (text) finish(text, model);
+          if (text) finish(text);
         } catch (e) {
           finishLog(log, { error: e.message });
-          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          setTranscripts(t => t.map((v,j)=>j===rowIndex?{ ...v, pending:false, error: e.message }:v));
           showError(e.message);
         }
       } else {
         const logBody = { model, audio: '<bytes>' };
         const log = startLog('ASR', model, logBody, model);
         const text = texts[audio.index]?.text || '';
-        finish(text, model);
+        finish(text);
         finishLog(log, text);
       }
-    }
+    })());
+    await Promise.all(tasks);
     setStatus('');
   };
 
