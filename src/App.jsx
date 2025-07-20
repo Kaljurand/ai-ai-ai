@@ -1071,7 +1071,7 @@ export default function App({ darkMode, setDarkMode }) {
           continue;
         }
         const blob = await res.blob();
-        finishLog(log, '<bytes>', cost);
+        finishLog(log, { model, data: '<bytes>' }, cost);
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
@@ -1099,7 +1099,7 @@ export default function App({ darkMode, setDarkMode }) {
           continue;
         }
         const blob = await res.blob();
-        finishLog(log, '<bytes>', cost);
+        finishLog(log, { model, data: '<bytes>' }, cost);
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
@@ -1109,7 +1109,7 @@ export default function App({ darkMode, setDarkMode }) {
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
-        finishLog(log, '<bytes>', cost);
+        finishLog(log, { model, data: '<bytes>' }, cost);
       }
     }
   };
@@ -1138,7 +1138,9 @@ export default function App({ darkMode, setDarkMode }) {
           const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
           const headers = {};
           if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
-          const log = startLog('POST', url, '<bytes>', model);
+          const logBody = { model: orModel, file: '<bytes>' };
+          if (asrPrompt) logBody.prompt = expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const log = startLog('POST', url, logBody, model);
           const res = await fetchWithLoading(url, { method: 'POST', headers, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
@@ -1160,7 +1162,9 @@ export default function App({ darkMode, setDarkMode }) {
         if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://api.mistral.ai/v1/audio/transcriptions';
-          const log = startLog('POST', url, '<bytes>', model);
+          const logBody = { model, file: '<bytes>' };
+          if (asrPrompt) logBody.prompt = expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const log = startLog('POST', url, logBody, model);
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'x-api-key': apiKeys.mistral }, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
@@ -1182,7 +1186,9 @@ export default function App({ darkMode, setDarkMode }) {
         if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
-          const log = startLog('POST', url, '<bytes>', model);
+          const logBody = { model, file: '<bytes>' };
+          if (asrPrompt) logBody.prompt = expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const log = startLog('POST', url, logBody, model);
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
@@ -1198,7 +1204,8 @@ export default function App({ darkMode, setDarkMode }) {
           showError(e.message);
         }
       } else {
-        const log = startLog('ASR', model, '<bytes>', model);
+        const logBody = { model, audio: '<bytes>' };
+        const log = startLog('ASR', model, logBody, model);
         const text = texts[audio.index]?.text || '';
         finish(text, model);
         finishLog(log, text);
@@ -1398,7 +1405,7 @@ export default function App({ darkMode, setDarkMode }) {
     { field: 'time', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_log') },
     { field: 'method', headerName: t('actions'), width: 100, renderCell: p => renderCell(p, 'tab_log') },
     { field: 'url', headerName: 'Endpoint', flex: 1, renderCell: p => renderCell(p, 'tab_log') },
-    { field: 'body', headerName: 'Body', flex: 1, renderCell: p => renderCell(p, 'tab_log') },
+    { field: 'body', headerName: 'Query', flex: 1, renderCell: p => renderCell(p, 'tab_log') },
     { field: 'response', headerName: 'Response', flex: 1, renderCell: p => renderProgressCell(p, 'tab_log') },
     { field: 'cost', headerName: 'Cost', width: 100, renderCell: p => renderProgressCell(p, 'tab_log') },
     { field: 'duration', headerName: t('duration'), width: 100, renderCell: p => renderProgressCell(p, 'tab_log') },
