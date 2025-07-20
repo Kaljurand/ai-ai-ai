@@ -31,6 +31,8 @@ import {
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import DownloadIcon from '@mui/icons-material/Download';
 import CloseIcon from '@mui/icons-material/Close';
 import ArticleIcon from '@mui/icons-material/Article';
 import AudiotrackIcon from '@mui/icons-material/Audiotrack';
@@ -422,6 +424,10 @@ const translations = {
     modality: 'Modality',
     pricing: 'Pricing',
     duration: 'Duration',
+    length: 'Length',
+    format: 'Format',
+    download: 'Download',
+    play: 'Play',
     logSize: 'Log rows',
     storageUsage: 'Storage used'
   },
@@ -499,6 +505,10 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
+    length: 'Pikkus',
+    format: 'Formaat',
+    download: 'Laadi alla',
+    play: 'Mängi',
     logSize: 'Logi ridade arv',
     storageUsage: 'Kasutatud salvestus'
   },
@@ -574,6 +584,10 @@ const translations = {
     modality: 'Modaliteet',
     pricing: 'Hind',
     duration: 'Kestus',
+    length: 'Pikkus',
+    format: 'Formaat',
+    download: 'Laadi alla',
+    play: 'Mängi',
     logSize: 'Logi ridadõ arv',
     storageUsage: 'Kasutatu salvestus'
   }
@@ -604,6 +618,7 @@ export default function App({ darkMode, setDarkMode }) {
   const [selectedTextModels, setSelectedTextModels] = useStoredState('selectedTextModels', []);
   const [selectedTextId, setSelectedTextId] = useState(null);
   const [selectedAudioId, setSelectedAudioId] = useState(null);
+  const [audioDialogRow, setAudioDialogRow] = useState(null);
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
   const [promptAnchor, setPromptAnchor] = useState(null);
@@ -812,11 +827,23 @@ export default function App({ darkMode, setDarkMode }) {
     return 'dat';
   };
 
+  const formatFromDataUrl = url => {
+    const m = url.match(/^data:(.*?);/);
+    return mimeExtension(m ? m[1] : '');
+  };
+
   const audioDuration = url => new Promise(resolve => {
     const a = new Audio();
     a.addEventListener('loadedmetadata', () => resolve(a.duration || 0));
     a.src = url;
   });
+
+  const saveAudio = row => {
+    const a = document.createElement('a');
+    a.href = row.url;
+    a.download = `audio-${(row.id != null ? row.id + 1 : '')}.${row.format || formatFromDataUrl(row.url)}`;
+    a.click();
+  };
 
 
   useEffect(() => {
@@ -996,9 +1023,10 @@ export default function App({ darkMode, setDarkMode }) {
   const uploadAudio = async (file) => {
     if (!file || selectedTextId === null) return;
     const data = await blobToDataUrl(file);
+    const format = mimeExtension(file.type || '');
     const duration = await audioDuration(data);
     const timestamp = new Date().toISOString();
-    setAudios([...audios, { index: selectedTextId, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp, duration }]);
+    setAudios([...audios, { index: selectedTextId, provider: 'upload', url: data, data, prompt: ttsPrompt, timestamp, duration, format }]);
   };
 
   const startRecording = async () => {
@@ -1008,9 +1036,10 @@ export default function App({ darkMode, setDarkMode }) {
       const rec = new MediaRecorder(stream);
       rec.ondataavailable = async e => {
         const data = await blobToDataUrl(e.data);
+        const format = mimeExtension(e.data.type || '');
         const duration = await audioDuration(data);
         const timestamp = new Date().toISOString();
-        setAudios(a => [...a, { index: selectedTextId, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp, duration }]);
+        setAudios(a => [...a, { index: selectedTextId, provider: 'record', url: data, data, prompt: ttsPrompt, timestamp, duration, format }]);
       };
       rec.start();
       setRecorder(rec);
@@ -1049,8 +1078,9 @@ export default function App({ darkMode, setDarkMode }) {
           const blob = await openRouterTts(orModel, input, instr, apiKeys.openrouter, fetchWithLoading);
           finishLog(log, { model, data: '<bytes>' }, cost);
           const data = await blobToDataUrl(blob);
+          const format = mimeExtension(blob.type || '');
           const duration = await audioDuration(data);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, format, pending:false }:v));
         } catch (e) {
           finishLog(log, { error: e.message }, cost);
           showError(e.message);
@@ -1064,8 +1094,9 @@ export default function App({ darkMode, setDarkMode }) {
           const blob = await openAiTts(model, input, instr, apiKeys.openai, fetchWithLoading);
           finishLog(log, { model, data: '<bytes>' }, cost);
           const data = await blobToDataUrl(blob);
+          const format = mimeExtension(blob.type || '');
           const duration = await audioDuration(data);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, format, pending:false }:v));
         } catch (e) {
           finishLog(log, { error: e.message }, cost);
           showError(e.message);
@@ -1075,8 +1106,9 @@ export default function App({ darkMode, setDarkMode }) {
         const log = startLog('TTS', model, fullPrompt, model, cost);
         const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
         const data = await blobToDataUrl(blob);
+        const format = mimeExtension(blob.type || '');
         const duration = await audioDuration(data);
-        setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+        setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, format, pending:false }:v));
         finishLog(log, { model, data: '<bytes>' }, cost);
       }
     }
@@ -1269,46 +1301,75 @@ export default function App({ darkMode, setDarkMode }) {
     }
   ];
 
-  const audioRows = audios.map((a, i) => ({ id: i, ...a, _index: i }));
-  const renderAudioCell = p => (
-    p.row.pending ? '' : (
-      <div>
-        {p.row.error && <div style={{color:'red'}}>{p.row.error}</div>}
-        {p.row.url && <audio controls src={p.row.url}></audio>}
-        {p.row.storageError && <div style={{color:'red'}}>{t('storageFailed')}</div>}
-      </div>
-    )
+  const audioRows = audios.map((a, i) => ({ id: i, ...a, text: texts[a.index]?.text || '', _index: i }));
+  const renderAudioActions = row => (
+    <>
+      <Tooltip title={t('toAsr')}>
+        <IconButton onClick={e => { e.stopPropagation(); setSelectedAudioId(row._index); setView('asr'); }} size="small">
+          <ArrowForwardIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title={t('play')}>
+        <IconButton onClick={e => { e.stopPropagation(); setAudioDialogRow(row); }} size="small">
+          <PlayArrowIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title={t('download')}>
+        <IconButton onClick={e => { e.stopPropagation(); saveAudio(row); }} size="small">
+          <DownloadIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title={t('delete')}>
+        <IconButton onClick={e => { e.stopPropagation(); deleteAudio(row._index); }} size="small" color="error">
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </>
   );
   const audioColumns = [
+    { field: 'id', headerName: t('audioId'), width: 70, valueGetter: p => p.row && p.row.id != null ? p.row.id + 1 : '', renderCell: p => renderCell(p, 'tab_audio') },
     { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_audio') },
     { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell: p => renderCell(p, 'tab_audio') },
     { field: 'provider', headerName: t('source'), width: 120, renderCell: p => renderCell(p, 'tab_audio') },
+    { field: 'text', headerName: t('text'), flex: 1, renderCell: p => renderCell(p, 'tab_audio') },
+    { field: 'duration', headerName: t('length'), width: 80, type: 'number', valueFormatter: p => p.value != null ? p.value.toFixed(1) : '', renderCell: p => renderCell(p, 'tab_audio') },
+    { field: 'format', headerName: t('format'), width: 90, renderCell: p => renderCell(p, 'tab_audio') },
     {
-      field: 'text',
-      headerName: t('text'),
-      flex: 1,
-      valueGetter: p => (p && p.row && p.row.index != null ? (texts[p.row.index]?.text || '') : ''),
-      renderCell: p => renderCell(p, 'tab_audio')
-    },
-    { field: 'audio', headerName: t('audio'), flex: 1, sortComparator: (a,b,c,d) => (c?.row?.duration ?? 0) - (d?.row?.duration ?? 0), renderCell: renderAudioCell },
-    {
-      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 160,
-      renderCell: params => (
-        <>
-          <Tooltip title={t('toAsr')}>
-            <IconButton onClick={e => { e.stopPropagation(); setSelectedAudioId(params.row._index); setView('asr'); }} size="small">
-              <ArrowForwardIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={t('delete')}>
-            <IconButton onClick={e => { e.stopPropagation(); deleteAudio(params.row._index); }} size="small" color="error">
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </>
-      )
+      field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 200,
+      renderCell: params => renderAudioActions(params.row)
     }
   ];
+
+  const audioDialog = (
+    <Dialog open={Boolean(audioDialogRow)} onClose={() => setAudioDialogRow(null)} fullWidth maxWidth="sm">
+      {audioDialogRow && (
+        <>
+          <DialogTitle id="audio-dialog-title">
+            #{audioDialogRow.id + 1} {audioDialogRow.timestamp} {audioDialogRow.provider}
+            <IconButton size="small" onClick={() => setAudioDialogRow(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            {audioDialogRow.url && (
+              <audio controls autoPlay src={audioDialogRow.url} style={{ width: '100%', marginBottom: '1em' }} />
+            )}
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="caption">{t('text')}</Typography>
+              <div>{audioDialogRow.text}</div>
+            </Box>
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="caption">{t('format')}</Typography>
+              <div>{audioDialogRow.format}</div>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'flex-start' }}>
+            {renderAudioActions(audioDialogRow)}
+          </DialogActions>
+        </>
+      )}
+    </Dialog>
+  );
 
   const resultRows = rows.map((r, idx) => ({ id: idx, ...r, _index: idx }));
   const resultColumns = [
@@ -1651,6 +1712,7 @@ export default function App({ darkMode, setDarkMode }) {
             initialSort={[{ field: 'timestamp', sort: 'desc' }]}
           />
           {status && <p>{status}</p>}
+          {audioDialog}
         </div>
       )}
       {view === 'asr' && (
