@@ -707,18 +707,22 @@ export default function App({ darkMode, setDarkMode }) {
   const logIdRef = React.useRef(0);
   const fmtBytes = b => (b / 1048576).toFixed(1) + ' MB';
   const truncate = v => {
+    const mask = s => {
+      const m = s.match(/^data:.*?;base64,(.*)$/);
+      if (m && m[1].length > 100) return '<bytes>';
+      if (s.length > 100 && /^[A-Za-z0-9+/=]+$/.test(s)) return '<bytes>';
+      return s;
+    };
     if (typeof v === 'string') {
-      try { v = JSON.parse(v); } catch { return v.length > 50 ? v.slice(0, 25) + '...' + v.slice(-20) : v; }
+      try { v = JSON.parse(v); } catch { return mask(v); }
     }
     if (typeof v === 'object' && v) {
       const out = {};
       for (const [k, val] of Object.entries(v)) {
-        if (typeof val === 'string' && val.length > 50) out[k] = val.slice(0, 50) + '...';
+        if (typeof val === 'string') out[k] = mask(val);
         else out[k] = val;
       }
-      let str = JSON.stringify(out);
-      if (str.length > 1000) str = str.slice(0, 1000) + '...';
-      return str;
+      return JSON.stringify(out);
     }
     return String(v);
   };
@@ -1067,7 +1071,7 @@ export default function App({ darkMode, setDarkMode }) {
           continue;
         }
         const blob = await res.blob();
-        finishLog(log, '<audio>', cost);
+        finishLog(log, '<bytes>', cost);
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
@@ -1095,7 +1099,7 @@ export default function App({ darkMode, setDarkMode }) {
           continue;
         }
         const blob = await res.blob();
-        finishLog(log, '<audio>', cost);
+        finishLog(log, '<bytes>', cost);
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
@@ -1105,7 +1109,7 @@ export default function App({ darkMode, setDarkMode }) {
         const data = await blobToDataUrl(blob);
         const duration = await audioDuration(data);
         setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
-        finishLog(log, '<audio>', cost);
+        finishLog(log, '<bytes>', cost);
       }
     }
   };
@@ -1134,7 +1138,7 @@ export default function App({ darkMode, setDarkMode }) {
           const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
           const headers = {};
           if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
-          const log = startLog('POST', url, '<audio>', model);
+          const log = startLog('POST', url, '<bytes>', model);
           const res = await fetchWithLoading(url, { method: 'POST', headers, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
@@ -1156,7 +1160,7 @@ export default function App({ darkMode, setDarkMode }) {
         if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://api.mistral.ai/v1/audio/transcriptions';
-          const log = startLog('POST', url, '<audio>', model);
+          const log = startLog('POST', url, '<bytes>', model);
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'x-api-key': apiKeys.mistral }, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
@@ -1178,7 +1182,7 @@ export default function App({ darkMode, setDarkMode }) {
         if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
         try {
           const url = 'https://api.openai.com/v1/audio/transcriptions';
-          const log = startLog('POST', url, '<audio>', model);
+          const log = startLog('POST', url, '<bytes>', model);
           const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
           const data = await res.json().catch(() => ({}));
           finishLog(log, data);
@@ -1194,7 +1198,7 @@ export default function App({ darkMode, setDarkMode }) {
           showError(e.message);
         }
       } else {
-        const log = startLog('ASR', model, '<audio>', model);
+        const log = startLog('ASR', model, '<bytes>', model);
         const text = texts[audio.index]?.text || '';
         finish(text, model);
         finishLog(log, text);
