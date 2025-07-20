@@ -6,7 +6,8 @@ System prompt: Generate a text to be used as input for TTS. Do not act as a chat
 
 ### Prompts
 
-- Generate 10 tongue twisters, each on a new line.
+- For a different typical Estonian animal up to 20 animals: write what does it say in Estonian in the form "animal name: animal sound, newline", without any explanations nor translations.
+- Generate 10 tongue twisters, each on a new line, without explanations nor translations. Include the following and use them for inspiration: "Kuuuurija istus töööös jääääres.", "Aoäia õe uue oaõieaia õueaua ööau.", "Anna õlu üle Ülo õe õla.".
 - Display the main content of <https://pohiseadus.ee/sisu/3554>.
 - Write an Estonian haiku in the style of Jaan Pehk.
 - Write an Estonian sports report, for example: "Eesti esireket Mark Lajal (ATP 167.) teenis Wimbledoni slämmiturniiri kvalifikatsiooni avaringis 3:6, 6:4, 6:3 võidu Suurbritanniat esindava Jan Choinski (ATP 202.) üle."
