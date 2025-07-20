@@ -216,7 +216,7 @@ function PersistedGrid({ storageKey, t, initialCols = {}, initialSort = [], ...p
   );
 }
 
-function renderCell(params, tab) {
+function renderCell(params, tab, pending = false) {
   let val = params.value == null ? '' : params.value;
   if (params.field === 'pricing' && val !== '') {
     val = Number(val).toFixed(2);
@@ -245,12 +245,12 @@ function renderCell(params, tab) {
   const title = ref ? `${val} ${ref}` : val;
   return (
     <Tooltip title={title} placement="top">
-      <span style={style}>{val}</span>
+      <span style={style} className={pending ? 'pending-cell' : ''}>{val}</span>
     </Tooltip>
   );
 }
 
-function renderHtmlCell(params, tab) {
+function renderHtmlCell(params, tab, pending = false) {
   const text = (params.value || '').replace(/<[^>]+>/g, '');
   const id = params.row.id != null ? params.row.id + 1 : (params.row.i ?? params.row.index ?? '');
   const ref = tab && id !== '' ? `{{${tab}.table.${id}.${params.field}}}` : '';
@@ -258,6 +258,7 @@ function renderHtmlCell(params, tab) {
   return (
     <Tooltip title={title} placement="top">
       <span
+        className={pending ? 'pending-cell' : ''}
         style={{
           whiteSpace: 'normal',
           wordWrap: 'break-word',
@@ -273,8 +274,9 @@ function renderHtmlCell(params, tab) {
 }
 
 function renderProgressCell(params, tab) {
-  if (params.row.pending && (params.value === undefined || params.value === '')) {
-    return <DotSpinner className="dot-spinner" />;
+  const pending = params.row.pending && (params.value === undefined || params.value === '');
+  if (pending) {
+    return renderCell(params, tab, true);
   }
   if (params.row.error) {
     return <span style={{color:'red'}}>{params.row.error}</span>;
@@ -283,8 +285,9 @@ function renderProgressCell(params, tab) {
 }
 
 function renderHtmlProgressCell(params, tab) {
-  if (params.row.pending && !params.value) {
-    return <DotSpinner className="dot-spinner" />;
+  const pending = params.row.pending && !params.value;
+  if (pending) {
+    return renderHtmlCell(params, tab, true);
   }
   if (params.row.error) {
     return <span style={{color:'red'}}>{params.row.error}</span>;
@@ -940,54 +943,57 @@ export default function App({ darkMode, setDarkMode }) {
   const generateTexts = async () => {
     setStatus('Generating text...');
     const timestamp = new Date().toISOString();
-    for (const model of selectedTextModels) {
+    const promises = selectedTextModels.map(model => {
       let rowIndex;
       setTexts(t => {
         rowIndex = t.length;
         return [...t, { provider: model, text: '', prompt: textPrompt, timestamp, pending: true }];
       });
-      if (openRouterMap[model]) {
-        const orModel = openRouterMap[model].id;
-        const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
-        const log = startLog('POST', 'https://openrouter.ai/api/v1/chat/completions', body, model);
-        try {
-          const data = await openRouterChat(orModel, body, apiKeys.openrouter, fetchWithLoading);
-          finishLog(log, data);
-          const text = data.choices?.[0]?.message?.content?.trim();
-          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
-        } catch (e) {
-          finishLog(log, { error: e.message });
-          showError(e.message);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+      return (async () => {
+        if (openRouterMap[model]) {
+          const orModel = openRouterMap[model].id;
+          const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
+          const log = startLog('POST', 'https://openrouter.ai/api/v1/chat/completions', body, model);
+          try {
+            const data = await openRouterChat(orModel, body, apiKeys.openrouter, fetchWithLoading);
+            finishLog(log, data);
+            const text = data.choices?.[0]?.message?.content?.trim();
+            if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+          } catch (e) {
+            finishLog(log, { error: e.message });
+            showError(e.message);
+            setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          }
+        } else if (googleModels.includes(model)) {
+          const prompt = expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const log = startLog('POST', 'google generate', prompt, model);
+          try {
+            const data = await googleGenerateText(model, prompt, apiKeys.google, fetchWithLoading);
+            finishLog(log, data);
+            const text = data.candidates?.[0]?.output?.trim();
+            if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+          } catch (e) {
+            finishLog(log, { error: e.message });
+            showError(e.message);
+            setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          }
+        } else {
+          const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
+          const log = startLog('POST', 'https://api.openai.com/v1/chat/completions', body, model);
+          try {
+            const data = await openAiChat(model, body, apiKeys.openai, fetchWithLoading);
+            finishLog(log, data);
+            const text = data.choices?.[0]?.message?.content?.trim();
+            if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+          } catch (e) {
+            finishLog(log, { error: e.message });
+            showError(e.message);
+            setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          }
         }
-      } else if (googleModels.includes(model)) {
-        const prompt = expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt });
-        const log = startLog('POST', 'google generate', prompt, model);
-        try {
-          const data = await googleGenerateText(model, prompt, apiKeys.google, fetchWithLoading);
-          finishLog(log, data);
-          const text = data.candidates?.[0]?.output?.trim();
-          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
-        } catch (e) {
-          finishLog(log, { error: e.message });
-          showError(e.message);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
-        }
-      } else {
-        const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
-        const log = startLog('POST', 'https://api.openai.com/v1/chat/completions', body, model);
-        try {
-          const data = await openAiChat(model, body, apiKeys.openai, fetchWithLoading);
-          finishLog(log, data);
-          const text = data.choices?.[0]?.message?.content?.trim();
-          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
-        } catch (e) {
-          finishLog(log, { error: e.message });
-          showError(e.message);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
-        }
-      }
-    }
+      })();
+    });
+    await Promise.all(promises);
     setStatus('');
   };
 
@@ -1032,53 +1038,56 @@ export default function App({ darkMode, setDarkMode }) {
     const timestamp = new Date().toISOString();
     const fullPrompt = `${ttsMetaPrompt} ${ttsPrompt}`;
     setTexts([...texts, { provider: 'tts', text: ttsPrompt, instructions: ttsMetaPrompt }]);
-    for (const model of selectedTtsModels) {
+    const promises = selectedTtsModels.map(model => {
       const cost = ttsModels.find(m => m.id === model)?.cost || '';
       let rowIndex;
       setAudios(a => {
         rowIndex = a.length;
         return [...a, { index: idx, provider: model, prompt: ttsPrompt, instructions: ttsMetaPrompt, timestamp, pending: true }];
       });
-      if (openRouterMap[model]) {
-        const orModel = openRouterMap[model].id;
-        const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
-        const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
-        const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/speech', { model: orModel, input }, model, cost);
-        try {
-          const blob = await openRouterTts(orModel, input, instr, apiKeys.openrouter, fetchWithLoading);
-          finishLog(log, { model, data: '<bytes>' }, cost);
+      return (async () => {
+        if (openRouterMap[model]) {
+          const orModel = openRouterMap[model].id;
+          const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/speech', { model: orModel, input }, model, cost);
+          try {
+            const blob = await openRouterTts(orModel, input, instr, apiKeys.openrouter, fetchWithLoading);
+            finishLog(log, { model, data: '<bytes>' }, cost);
+            const data = await blobToDataUrl(blob);
+            const duration = await audioDuration(data);
+            setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+          } catch (e) {
+            finishLog(log, { error: e.message }, cost);
+            showError(e.message);
+            setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          }
+        } else if (openAiModels.includes(model)) {
+          const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const log = startLog('POST', 'https://api.openai.com/v1/audio/speech', { model, input }, model, cost);
+          try {
+            const blob = await openAiTts(model, input, instr, apiKeys.openai, fetchWithLoading);
+            finishLog(log, { model, data: '<bytes>' }, cost);
+            const data = await blobToDataUrl(blob);
+            const duration = await audioDuration(data);
+            setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+          } catch (e) {
+            finishLog(log, { error: e.message }, cost);
+            showError(e.message);
+            setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+          }
+        } else {
+          const log = startLog('TTS', model, fullPrompt, model, cost);
+          const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
           const data = await blobToDataUrl(blob);
           const duration = await audioDuration(data);
           setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
-        } catch (e) {
-          finishLog(log, { error: e.message }, cost);
-          showError(e.message);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
-        }
-      } else if (openAiModels.includes(model)) {
-        const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
-        const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
-        const log = startLog('POST', 'https://api.openai.com/v1/audio/speech', { model, input }, model, cost);
-        try {
-          const blob = await openAiTts(model, input, instr, apiKeys.openai, fetchWithLoading);
           finishLog(log, { model, data: '<bytes>' }, cost);
-          const data = await blobToDataUrl(blob);
-          const duration = await audioDuration(data);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
-        } catch (e) {
-          finishLog(log, { error: e.message }, cost);
-          showError(e.message);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
-      } else {
-        const log = startLog('TTS', model, fullPrompt, model, cost);
-        const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
-        const data = await blobToDataUrl(blob);
-        const duration = await audioDuration(data);
-        setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
-        finishLog(log, { model, data: '<bytes>' }, cost);
-      }
-    }
+      })();
+    });
+    await Promise.all(promises);
   };
 
   const transcribe = async (aIndex) => {
@@ -1086,63 +1095,66 @@ export default function App({ darkMode, setDarkMode }) {
     if (!audio) return;
     setStatus('Transcribing...');
     const blob = dataUrlToBlob(audio.data || audio.url);
-    for (const model of selectedAsrModels) {
+    const promises = selectedAsrModels.map(model => {
       let rowIndex;
-      const finish = (text, provider) => {
+      const finish = text => {
         setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       };
       setTranscripts(t => {
         rowIndex = t.length;
         return [...t, { aIndex, provider: model, text: '', prompt: asrPrompt, timestamp: new Date().toISOString(), pending: true }];
       });
-      if (openRouterMap[model]) {
-        const orModel = openRouterMap[model].id;
-        const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
-        const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/transcriptions', { model: orModel }, model);
-        try {
-          const data = await openRouterTranscribe(orModel, blob, prompt, apiKeys.openrouter, fetchWithLoading);
-          finishLog(log, data);
-          const text = data.text?.trim();
-          if (text) finish(text, model);
-        } catch (e) {
-          finishLog(log, { error: e.message });
-          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
-          showError(e.message);
+      return (async () => {
+        if (openRouterMap[model]) {
+          const orModel = openRouterMap[model].id;
+          const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+          const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/transcriptions', { model: orModel }, model);
+          try {
+            const data = await openRouterTranscribe(orModel, blob, prompt, apiKeys.openrouter, fetchWithLoading);
+            finishLog(log, data);
+            const text = data.text?.trim();
+            if (text) finish(text);
+          } catch (e) {
+            finishLog(log, { error: e.message });
+            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+            showError(e.message);
+          }
+        } else if (mistralModels.includes(model)) {
+          const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+          const log = startLog('POST', 'https://api.mistral.ai/v1/audio/transcriptions', { model }, model);
+          try {
+            const data = await mistralTranscribe(model, blob, prompt, apiKeys.mistral, fetchWithLoading);
+            finishLog(log, data);
+            const text = data.text?.trim();
+            if (text) finish(text);
+          } catch (e) {
+            finishLog(log, { error: e.message });
+            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+            showError(e.message);
+          }
+        } else if (openAiModels.includes(model)) {
+          const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+          const log = startLog('POST', 'https://api.openai.com/v1/audio/transcriptions', { model }, model);
+          try {
+            const data = await openAiTranscribe(model, blob, prompt, apiKeys.openai, fetchWithLoading);
+            finishLog(log, data);
+            const text = data.text?.trim();
+            if (text) finish(text);
+          } catch (e) {
+            finishLog(log, { error: e.message });
+            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
+            showError(e.message);
+          }
+        } else {
+          const logBody = { model, audio: '<bytes>' };
+          const log = startLog('ASR', model, logBody, model);
+          const text = texts[audio.index]?.text || '';
+          finish(text);
+          finishLog(log, text);
         }
-      } else if (mistralModels.includes(model)) {
-        const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
-        const log = startLog('POST', 'https://api.mistral.ai/v1/audio/transcriptions', { model }, model);
-        try {
-          const data = await mistralTranscribe(model, blob, prompt, apiKeys.mistral, fetchWithLoading);
-          finishLog(log, data);
-          const text = data.text?.trim();
-          if (text) finish(text, model);
-        } catch (e) {
-          finishLog(log, { error: e.message });
-          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
-          showError(e.message);
-        }
-      } else if (openAiModels.includes(model)) {
-        const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
-        const log = startLog('POST', 'https://api.openai.com/v1/audio/transcriptions', { model }, model);
-        try {
-          const data = await openAiTranscribe(model, blob, prompt, apiKeys.openai, fetchWithLoading);
-          finishLog(log, data);
-          const text = data.text?.trim();
-          if (text) finish(text, model);
-        } catch (e) {
-          finishLog(log, { error: e.message });
-          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
-          showError(e.message);
-        }
-      } else {
-        const logBody = { model, audio: '<bytes>' };
-        const log = startLog('ASR', model, logBody, model);
-        const text = texts[audio.index]?.text || '';
-        finish(text, model);
-        finishLog(log, text);
-      }
-    }
+      })();
+    });
+    await Promise.all(promises);
     setStatus('');
   };
 
@@ -1508,8 +1520,8 @@ export default function App({ darkMode, setDarkMode }) {
         </Toolbar>
       </AppBar>
       <Box sx={{ pt: { xs: '56px', sm: '64px' } }}>
-      {view === 'text' && (
-        <div className="content">
+      <div className="content" style={{ display: view === 'text' ? "block" : "none" }}>
+
           <Tooltip title={expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
             <TextField
               label={t('promptForModels')}
@@ -1565,8 +1577,8 @@ export default function App({ darkMode, setDarkMode }) {
           />
         </div>
       )}
-      {view === 'audio' && (
-        <div className="content">
+      <div className="content" style={{ display: view === 'audio' ? "block" : "none" }}>
+
           <Tooltip title={expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
             <TextField
               label={t('metaPromptLabel')}
@@ -1652,8 +1664,8 @@ export default function App({ darkMode, setDarkMode }) {
           {status && <p>{status}</p>}
         </div>
       )}
-      {view === 'asr' && (
-        <div className="content">
+      <div className="content" style={{ display: view === 'asr' ? "block" : "none" }}>
+
           <Tooltip title={expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
             <TextField
               label={t('asrPromptLabel')}
@@ -1714,8 +1726,8 @@ export default function App({ darkMode, setDarkMode }) {
           {status && <p>{status}</p>}
         </div>
       )}
-      {view === 'models' && (
-        <div className="content">
+      <div className="content" style={{ display: view === 'models' ? "block" : "none" }}>
+
           <FormControlLabel
             control={<Switch checked={showSelectedOnly} onChange={e => setShowSelectedOnly(e.target.checked)} />}
             label={t('showSelected')}
@@ -1731,8 +1743,8 @@ export default function App({ darkMode, setDarkMode }) {
           />
         </div>
       )}
-      {view === 'log' && (
-        <div className="content">
+      <div className="content" style={{ display: view === 'log' ? "block" : "none" }}>
+
           <Divider sx={{ my: 2 }} />
           <ExportButtons rows={logRows} columns={logColumns} name="logs" t={t} />
           <PersistedGrid
@@ -1745,8 +1757,8 @@ export default function App({ darkMode, setDarkMode }) {
           />
         </div>
       )}
-      {view === 'config' && (
-        <div className="content">
+      <div className="content" style={{ display: view === 'config' ? "block" : "none" }}>
+
           <Divider textAlign="left" sx={{ mb: 1 }}>{t('keysGroup')}</Divider>
           <TextField
             label={t('openaiKey')}
