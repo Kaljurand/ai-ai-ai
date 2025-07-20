@@ -28,6 +28,16 @@ describe('transcriptsToRows', () => {
     expect(rows[0].wer).toBe('');
   });
 
+  it('preserves timestamp field', () => {
+    const texts = [];
+    const audios = [];
+    const transcripts = [
+      { aIndex: 0, provider: 'mock', text: 'hi', timestamp: '2024-01-01T00:00:00Z' }
+    ];
+    const rows = transcriptsToRows(transcripts, audios, texts);
+    expect(rows[0].timestamp).toBe('2024-01-01T00:00:00Z');
+  });
+
   it('ignores TTS instructions when computing WER', () => {
     const texts = [{ text: 'hello there', instructions: 'fast', provider: 'tts' }];
     const audios = [{ index: 0, provider: 'tts' }];

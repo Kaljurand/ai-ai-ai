@@ -74,8 +74,8 @@ function PaperComponent(props) {
 }
 
 
-function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
-  const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', []);
+function PersistedGrid({ storageKey, t, initialCols = {}, initialSort = [], ...props }) {
+  const [sortModel, setSortModel] = useStoredState(storageKey + 'Sort', initialSort);
   const [filterModel, setFilterModel] = useStoredState(storageKey + 'Filter', { items: [] });
   const [cols, setCols] = useStoredState(storageKey + 'Cols', initialCols);
   const [previewRow, setPreviewRow] = useState(null);
@@ -1312,6 +1312,7 @@ export default function App({ darkMode, setDarkMode }) {
   const resultRows = rows.map((r, idx) => ({ id: idx, ...r, _index: idx }));
   const resultColumns = [
     { field: 'i', headerName: t('transcriptId'), width: 70, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_asr') },
     { field: 'textSource', headerName: t('textSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
     { field: 'audioSource', headerName: t('audioSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
     { field: 'asrSource', headerName: t('asrSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
@@ -1560,6 +1561,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={textRows}
             columns={textColumns}
             t={t}
+            initialSort={[{ field: 'timestamp', sort: 'desc' }]}
           />
         </div>
       )}
@@ -1645,6 +1647,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={audioRows}
             columns={audioColumns}
             t={t}
+            initialSort={[{ field: 'timestamp', sort: 'desc' }]}
           />
           {status && <p>{status}</p>}
         </div>
@@ -1706,6 +1709,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={resultRows}
             columns={resultColumns}
             t={t}
+            initialSort={[{ field: 'timestamp', sort: 'desc' }]}
           />
           {status && <p>{status}</p>}
         </div>
@@ -1723,6 +1727,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={filteredModelRows}
             columns={modelColumns}
             t={t}
+            initialSort={[{ field: 'pricing', sort: 'desc' }]}
           />
         </div>
       )}
@@ -1736,6 +1741,7 @@ export default function App({ darkMode, setDarkMode }) {
             columns={logColumns}
             t={t}
             initialCols={{ duration: false }}
+            initialSort={[{ field: 'time', sort: 'desc' }]}
           />
         </div>
       )}
