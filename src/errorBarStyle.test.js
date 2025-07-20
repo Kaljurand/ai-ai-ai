@@ -10,4 +10,9 @@ describe('error bar style', () => {
     const css = fs.readFileSync('src/style.css', 'utf8');
     expect(css.includes('.dot-spinner')).toBe(true);
   });
+  it('contains pending-row animation', () => {
+    const css = fs.readFileSync('src/style.css', 'utf8');
+    expect(css.includes('.pending-row')).toBe(true);
+    expect(css.includes('@keyframes rowPending')).toBe(true);
+  });
 });
