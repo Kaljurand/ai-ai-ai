@@ -49,6 +49,20 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import DotSpinner from './DotSpinner';
+import {
+  fetchOpenRouterModels,
+  fetchOpenAiModels,
+  fetchGoogleModels,
+  fetchGoogleVoices,
+  openRouterChat,
+  openAiChat,
+  googleGenerateText,
+  openRouterTts,
+  openAiTts,
+  openRouterTranscribe,
+  openAiTranscribe,
+  mistralTranscribe
+} from './providers';
 
 import useStoredState from "./useStoredState";
 function PaperComponent(props) {
@@ -806,14 +820,10 @@ export default function App({ darkMode, setDarkMode }) {
 
   useEffect(() => {
     (async () => {
-      const url = 'https://openrouter.ai/api/v1/models';
       try {
-        const log = startLog('GET', url, '', 'openrouter');
-        const res = await fetchWithLoading(url);
-        const data = await res.json().catch(() => ({}));
-        finishLog(log, data);
-        if (!res.ok) throw new Error(data.error?.message || data.detail || 'Failed to fetch OpenRouter models');
-        const models = (data.data || []).map(m => ({ ...m, base: m.id.split('/').pop() }));
+        const log = startLog('GET', 'https://openrouter.ai/api/v1/models', '', 'openrouter');
+        const models = await fetchOpenRouterModels(fetchWithLoading);
+        finishLog(log, { models: models.length });
         if (models.length) {
           setOpenRouterModels(models);
           const map = {};
@@ -842,28 +852,24 @@ export default function App({ darkMode, setDarkMode }) {
   useEffect(() => {
     if (!apiKeys.openai) return;
     (async () => {
-      const url = 'https://api.openai.com/v1/models';
       try {
-        const log = startLog('GET', url, '', 'openai');
-        const res = await fetchWithLoading(url, { headers: { 'Authorization': `Bearer ${apiKeys.openai}` } });
-        const data = await res.json().catch(() => ({}));
-        finishLog(log, data);
-        if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch OpenAI models');
-        const models = data.data?.map(m => m.id).sort();
-        if (models?.length) {
+        const log = startLog('GET', 'https://api.openai.com/v1/models', '', 'openai');
+        const models = await fetchOpenAiModels(apiKeys.openai, fetchWithLoading);
+        finishLog(log, { models: models.length });
+        if (models.length) {
           setOpenAiModels(models);
           if (!models.includes(openAiModel)) setOpenAiModel(models[0]);
         }
-        const tts = data.data?.filter(m => m.id.startsWith('tts-') || /audio|speech|multimodal/i.test(m.id)).map(m => ({ id: m.id, name: m.id, cost: '', provider: 'openai' })) || [];
-        if (!tts.some(m => m.id === 'gpt-4o-mini-tts')) {
-          tts.push({ id: 'gpt-4o-mini-tts', name: 'gpt-4o-mini-tts', cost: '', provider: 'openai' });
+        const ttsList = models.filter(m => m.startsWith('tts-') || /audio|speech|multimodal/i.test(m)).map(m => ({ id: m, name: m, cost: '', provider: 'openai' }));
+        if (!ttsList.some(m => m.id === 'gpt-4o-mini-tts')) {
+          ttsList.push({ id: 'gpt-4o-mini-tts', name: 'gpt-4o-mini-tts', cost: '', provider: 'openai' });
         }
-        if (tts.length) {
-          setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !tts.some(v => v.id === x.id)), ...tts]);
-          if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
+        if (ttsList.length) {
+          setTtsModels(t => [...t.filter(x => !x.id.startsWith('tts-') && !ttsList.some(v => v.id === x.id)), ...ttsList]);
+          if (!selectedTtsModels.length) setSelectedTtsModels([ttsList[0].id]);
         }
-        const asr = data.data?.filter(m => /whisper|speech|audio|transcribe/i.test(m.id)).map(m => ({ id: m.id, name: m.id, provider: 'openai' }));
-        if (asr?.length) {
+        const asr = models.filter(m => /whisper|speech|audio|transcribe/i.test(m)).map(m => ({ id: m, name: m, provider: 'openai' }));
+        if (asr.length) {
           setAsrModels(a => [...a.filter(x => !asr.some(v => v.id === x.id)), ...asr]);
           if (!selectedAsrModels.length) setSelectedAsrModels([asr[0].id]);
         }
@@ -889,15 +895,11 @@ export default function App({ darkMode, setDarkMode }) {
   useEffect(() => {
     if (!apiKeys.google) return;
     (async () => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.google}`;
       try {
-        const log = startLog('GET', url, '', 'google');
-        const res = await fetchWithLoading(url);
-        const data = await res.json().catch(() => ({}));
-        finishLog(log, data);
-        if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google models');
-        const models = data.models?.map(m => m.name);
-        if (models?.length) {
+        const log = startLog('GET', 'https://generativelanguage.googleapis.com/v1beta/models', '', 'google');
+        const models = await fetchGoogleModels(apiKeys.google, fetchWithLoading);
+        finishLog(log, { models: models.length });
+        if (models.length) {
           setGoogleModels(models);
           if (!models.includes(googleModel)) setGoogleModel(models[0]);
           const multi = models.filter(m => /speech|audio|multimodal/i.test(m)).map(m => ({ id: m, name: m, cost: '', provider: 'google' }));
@@ -920,17 +922,14 @@ export default function App({ darkMode, setDarkMode }) {
   useEffect(() => {
     if (!apiKeys.google) return;
     (async () => {
-      const url = `https://texttospeech.googleapis.com/v1/voices?key=${apiKeys.google}`;
       try {
-        const log = startLog('GET', url, '', 'google');
-        const res = await fetchWithLoading(url);
-        const data = await res.json().catch(() => ({}));
-        finishLog(log, data);
-        if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch Google voices');
-        const voices = data.voices?.map(v => ({ id: v.name, name: v.name, cost: '', provider: 'google' }));
-        if (voices?.length) {
-          setTtsModels(t => [...t.filter(x => !x.id.startsWith('projects/') && !voices.some(v => v.id === x.id)), ...voices]);
-          if (!selectedTtsModels.length) setSelectedTtsModels([voices[0].id]);
+        const log = startLog('GET', 'https://texttospeech.googleapis.com/v1/voices', '', 'google');
+        const voices = await fetchGoogleVoices(apiKeys.google, fetchWithLoading);
+        finishLog(log, { voices: voices.length });
+        if (voices.length) {
+          const voiceRows = voices.map(v => ({ id: v, name: v, cost: '', provider: 'google' }));
+          setTtsModels(t => [...t.filter(x => !x.id.startsWith('projects/') && !voiceRows.some(v => v.id === x.id)), ...voiceRows]);
+          if (!selectedTtsModels.length) setSelectedTtsModels([voiceRows[0].id]);
         }
       } catch (e) {
         showError(e.message);
@@ -949,52 +948,44 @@ export default function App({ darkMode, setDarkMode }) {
       });
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
-        const body = { model: orModel, messages: [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }] };
-        const headers = { 'Content-Type': 'application/json' };
-        if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
-        const url = 'https://openrouter.ai/api/v1/chat/completions';
-        const log = startLog('POST', url, body, model);
-        const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
-        const data = await res.json().catch(() => ({}));
-        finishLog(log, data);
-        if (!res.ok) {
-          const msg = data.error?.message || 'Text generation failed';
-          showError(msg);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-          continue;
+        const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
+        const log = startLog('POST', 'https://openrouter.ai/api/v1/chat/completions', body, model);
+        try {
+          const data = await openRouterChat(orModel, body, apiKeys.openrouter, fetchWithLoading);
+          finishLog(log, data);
+          const text = data.choices?.[0]?.message?.content?.trim();
+          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+        } catch (e) {
+          finishLog(log, { error: e.message });
+          showError(e.message);
+          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
-        const text = data.choices?.[0]?.message?.content?.trim();
-        if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       } else if (googleModels.includes(model)) {
-        const body = { prompt: { text: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) } };
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateText?key=${apiKeys.google}`;
-        const log = startLog('POST', url, body, model);
-        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const data = await res.json().catch(() => ({}));
-        finishLog(log, data);
-        if (!res.ok) {
-          const msg = data.error?.message || 'Text generation failed';
-          showError(msg);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-          continue;
+        const prompt = expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt });
+        const log = startLog('POST', 'google generate', prompt, model);
+        try {
+          const data = await googleGenerateText(model, prompt, apiKeys.google, fetchWithLoading);
+          finishLog(log, data);
+          const text = data.candidates?.[0]?.output?.trim();
+          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+        } catch (e) {
+          finishLog(log, { error: e.message });
+          showError(e.message);
+          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
-        const text = data.candidates?.[0]?.output?.trim();
-        if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       } else {
-        const body = { model, messages: [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }] };
-        const url = 'https://api.openai.com/v1/chat/completions';
-        const log = startLog('POST', url, body, model);
-        const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` }, body: JSON.stringify(body) });
-        const data = await res.json().catch(() => ({}));
-        finishLog(log, data);
-        if (!res.ok) {
-          const msg = data.error?.message || 'Text generation failed';
-          showError(msg);
-          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-          continue;
+        const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
+        const log = startLog('POST', 'https://api.openai.com/v1/chat/completions', body, model);
+        try {
+          const data = await openAiChat(model, body, apiKeys.openai, fetchWithLoading);
+          finishLog(log, data);
+          const text = data.choices?.[0]?.message?.content?.trim();
+          if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
+        } catch (e) {
+          finishLog(log, { error: e.message });
+          showError(e.message);
+          setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
-        const text = data.choices?.[0]?.message?.content?.trim();
-        if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, pending:false }:v));
       }
     }
     setStatus('');
@@ -1050,59 +1041,35 @@ export default function App({ darkMode, setDarkMode }) {
       });
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
-        const url = 'https://openrouter.ai/api/v1/audio/speech';
-        const body = {
-          model: orModel,
-          input: expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt }),
-          instructions: expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt }),
-          voice: 'alloy',
-          response_format: 'mp3'
-        };
-        const headers = { 'Content-Type': 'application/json' };
-        if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
-        const log = startLog('POST', url, body, model, cost);
-        const res = await fetchWithLoading(url, { method: 'POST', headers, body: JSON.stringify(body) });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          finishLog(log, err, cost);
-          const msg = err.error?.message || 'TTS request failed';
-          showError(msg);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-          continue;
+        const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
+        const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
+        const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/speech', { model: orModel, input }, model, cost);
+        try {
+          const blob = await openRouterTts(orModel, input, instr, apiKeys.openrouter, fetchWithLoading);
+          finishLog(log, { model, data: '<bytes>' }, cost);
+          const data = await blobToDataUrl(blob);
+          const duration = await audioDuration(data);
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+        } catch (e) {
+          finishLog(log, { error: e.message }, cost);
+          showError(e.message);
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
-        const blob = await res.blob();
-        finishLog(log, { model, data: '<bytes>' }, cost);
-        const data = await blobToDataUrl(blob);
-        const duration = await audioDuration(data);
-        setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
       } else if (openAiModels.includes(model)) {
-        const url = 'https://api.openai.com/v1/audio/speech';
-        const body = {
-          model,
-          input: expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt }),
-          instructions: expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt }),
-          voice: 'alloy',
-          response_format: 'mp3'
-        };
-        const log = startLog('POST', url, body, model, cost);
-        const res = await fetchWithLoading(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKeys.openai}` },
-          body: JSON.stringify(body)
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          finishLog(log, err, cost);
-          const msg = err.error?.message || 'TTS request failed';
-          showError(msg);
-          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-          continue;
+        const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
+        const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
+        const log = startLog('POST', 'https://api.openai.com/v1/audio/speech', { model, input }, model, cost);
+        try {
+          const blob = await openAiTts(model, input, instr, apiKeys.openai, fetchWithLoading);
+          finishLog(log, { model, data: '<bytes>' }, cost);
+          const data = await blobToDataUrl(blob);
+          const duration = await audioDuration(data);
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
+        } catch (e) {
+          finishLog(log, { error: e.message }, cost);
+          showError(e.message);
+          setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
         }
-        const blob = await res.blob();
-        finishLog(log, { model, data: '<bytes>' }, cost);
-        const data = await blobToDataUrl(blob);
-        const duration = await audioDuration(data);
-        setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, pending:false }:v));
       } else {
         const log = startLog('TTS', model, fullPrompt, model, cost);
         const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
@@ -1130,77 +1097,42 @@ export default function App({ darkMode, setDarkMode }) {
       });
       if (openRouterMap[model]) {
         const orModel = openRouterMap[model].id;
-        const form = new FormData();
-        form.append('model', orModel);
-        form.append('file', blob, `audio.${mimeExtension(blob.type)}`);
-        if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
+        const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+        const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/transcriptions', { model: orModel }, model);
         try {
-          const url = 'https://openrouter.ai/api/v1/audio/transcriptions';
-          const headers = {};
-          if (apiKeys.openrouter) headers['Authorization'] = `Bearer ${apiKeys.openrouter}`;
-          const logBody = { model: orModel, file: '<bytes>' };
-          if (asrPrompt) logBody.prompt = expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt });
-          const log = startLog('POST', url, logBody, model);
-          const res = await fetchWithLoading(url, { method: 'POST', headers, body: form });
-          const data = await res.json().catch(() => ({}));
+          const data = await openRouterTranscribe(orModel, blob, prompt, apiKeys.openrouter, fetchWithLoading);
           finishLog(log, data);
-          if (!res.ok) {
-            const msg = data.error?.message || 'Transcription failed';
-            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-            showError(msg);
-            continue;
-          }
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {
+          finishLog(log, { error: e.message });
+          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
           showError(e.message);
         }
       } else if (mistralModels.includes(model)) {
-        const form = new FormData();
-        form.append('model', model);
-        form.append('file', blob, `audio.${mimeExtension(blob.type)}`);
-        if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
+        const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+        const log = startLog('POST', 'https://api.mistral.ai/v1/audio/transcriptions', { model }, model);
         try {
-          const url = 'https://api.mistral.ai/v1/audio/transcriptions';
-          const logBody = { model, file: '<bytes>' };
-          if (asrPrompt) logBody.prompt = expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt });
-          const log = startLog('POST', url, logBody, model);
-          const res = await fetchWithLoading(url, { method: 'POST', headers: { 'x-api-key': apiKeys.mistral }, body: form });
-          const data = await res.json().catch(() => ({}));
+          const data = await mistralTranscribe(model, blob, prompt, apiKeys.mistral, fetchWithLoading);
           finishLog(log, data);
-          if (!res.ok) {
-            const msg = data.error?.message || 'Transcription failed';
-            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-            showError(msg);
-            continue;
-          }
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {
+          finishLog(log, { error: e.message });
+          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
           showError(e.message);
         }
       } else if (openAiModels.includes(model)) {
-        const form = new FormData();
-        form.append('model', model);
-        form.append('file', blob, `audio.${mimeExtension(blob.type)}`);
-        if (asrPrompt) form.append('prompt', expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }));
+        const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+        const log = startLog('POST', 'https://api.openai.com/v1/audio/transcriptions', { model }, model);
         try {
-          const url = 'https://api.openai.com/v1/audio/transcriptions';
-          const logBody = { model, file: '<bytes>' };
-          if (asrPrompt) logBody.prompt = expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt });
-          const log = startLog('POST', url, logBody, model);
-          const res = await fetchWithLoading(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKeys.openai}` }, body: form });
-          const data = await res.json().catch(() => ({}));
+          const data = await openAiTranscribe(model, blob, prompt, apiKeys.openai, fetchWithLoading);
           finishLog(log, data);
-          if (!res.ok) {
-            const msg = data.error?.message || 'Transcription failed';
-            setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: msg }:v));
-            showError(msg);
-            continue;
-          }
           const text = data.text?.trim();
           if (text) finish(text, model);
         } catch (e) {
+          finishLog(log, { error: e.message });
+          setTranscripts(t => t.map((v,i)=>i===rowIndex?{ ...v, pending:false, error: e.message }:v));
           showError(e.message);
         }
       } else {
