@@ -142,4 +142,9 @@ describe('App.jsx compilation', () => {
     expect(code.includes("type: 'number'")).toBe(true);
     expect(code.includes('1e6')).toBe(true);
   });
+  it('highlights pending rows', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('getRowClassName')).toBe(true);
+    expect(code.includes('pending-row')).toBe(true);
+  });
 });
