@@ -203,7 +203,12 @@ function PersistedGrid({ storageKey, t, initialCols = {}, ...props }) {
 }
 
 function renderCell(params, tab) {
-  let val = params.value == null ? '' : String(params.value);
+  let val = params.value == null ? '' : params.value;
+  if (params.field === 'pricing' && val !== '') {
+    val = Number(val).toFixed(2);
+  } else {
+    val = String(val);
+  }
   if (/^\d{4}-\d{2}-\d{2}T/.test(val)) {
     val = val.replace('T', ' ').slice(0, 19);
   }
@@ -810,7 +815,10 @@ export default function App({ darkMode, setDarkMode }) {
           const map = {};
           models.forEach(m => { map[m.base] = m; });
           setOpenRouterMap(map);
-          const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => ({ id: m.base, name: m.id, cost: m.pricing?.prompt || '', provider: 'openrouter' }));
+          const tts = models.filter(m => /tts|speech|audio/i.test(m.id)).map(m => {
+            const cost = parseFloat(m.pricing?.prompt || 0) * 1e6;
+            return { id: m.base, name: m.id, cost: Math.round(cost * 100) / 100, provider: 'openrouter' };
+          });
           if (tts.length) {
             setTtsModels(t => [...t.filter(x => !tts.some(v => v.id === x.id)), ...tts]);
             if (!selectedTtsModels.length) setSelectedTtsModels([tts[0].id]);
@@ -1422,13 +1430,13 @@ export default function App({ darkMode, setDarkMode }) {
     openRouterModels.forEach(m => {
       const prompt = parseFloat(m.pricing?.prompt || 0);
       const completion = parseFloat(m.pricing?.completion || 0);
-      const pricing = prompt + completion;
+      const pricing = (prompt + completion) * 1e6;
       const id = m.id.split('/').pop();
       const row = map[id] || { id, provider: 'openrouter', name: m.name };
       row.modelId = m.id;
       row.description = m.description;
       row.modality = m.architecture?.modality || row.modality;
-      row.pricing = pricing || row.pricing;
+      row.pricing = pricing ? Math.round(pricing * 100) / 100 : row.pricing;
       map[id] = row;
     });
     openAiModels.forEach(id => {
@@ -1456,7 +1464,7 @@ export default function App({ darkMode, setDarkMode }) {
     { field: 'name', headerName: t('modelName'), width: 200, renderCell: p => renderCell(p, 'tab_models') },
     { field: 'description', headerName: t('modelDesc'), flex: 1, renderCell: p => renderCell(p, 'tab_models') },
     { field: 'modality', headerName: t('modality'), width: 120, renderCell: p => renderCell(p, 'tab_models') },
-    { field: 'pricing', headerName: t('pricing'), width: 150, renderCell: p => renderCell(p, 'tab_models') },
+    { field: 'pricing', headerName: t('pricePerM'), width: 150, type: 'number', renderCell: p => renderCell(p, 'tab_models') },
     { field: 'text', headerName: t('tabText'), width: 80, sortable: false, filterable: false,
       renderCell: params => (
         <Checkbox size="small" checked={selectedTextModels.includes(params.row.id)} onChange={e => {
