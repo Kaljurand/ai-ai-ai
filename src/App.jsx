@@ -162,6 +162,7 @@ function PersistedGrid({ storageKey, t, initialCols = {}, initialSort = [], ...p
         autoHeight
         getRowHeight={() => 'auto'}
         disableRowSelectionOnClick
+        getRowClassName={params => params.row.pending ? 'pending-row' : ''}
         sx={{ '& .MuiDataGrid-cell': {
           whiteSpace: 'normal',
           overflowWrap: 'anywhere',
@@ -1282,13 +1283,11 @@ export default function App({ darkMode, setDarkMode }) {
 
   const audioRows = audios.map((a, i) => ({ id: i, ...a, _index: i }));
   const renderAudioCell = p => (
-    p.row.pending ? <DotSpinner className="dot-spinner" /> : (
-      <div>
-        {p.row.error && <div style={{color:'red'}}>{p.row.error}</div>}
-        {p.row.url && <audio controls src={p.row.url}></audio>}
-        {p.row.storageError && <div style={{color:'red'}}>{t('storageFailed')}</div>}
-      </div>
-    )
+    <div>
+      {p.row.error && <div style={{color:'red'}}>{p.row.error}</div>}
+      {p.row.url && <audio controls src={p.row.url}></audio>}
+      {p.row.storageError && <div style={{color:'red'}}>{t('storageFailed')}</div>}
+    </div>
   );
   const audioColumns = [
     { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_audio') },
