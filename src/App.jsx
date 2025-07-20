@@ -161,6 +161,7 @@ function PersistedGrid({ storageKey, t, initialCols = {}, initialSort = [], ...p
       <DataGrid
         autoHeight
         getRowHeight={() => 'auto'}
+        getRowClassName={params => params.row.pending ? 'pending-row' : ''}
         disableRowSelectionOnClick
         sx={{ '& .MuiDataGrid-cell': {
           whiteSpace: 'normal',
@@ -274,7 +275,7 @@ function renderHtmlCell(params, tab) {
 
 function renderProgressCell(params, tab) {
   if (params.row.pending && (params.value === undefined || params.value === '')) {
-    return <DotSpinner className="dot-spinner" />;
+    return '';
   }
   if (params.row.error) {
     return <span style={{color:'red'}}>{params.row.error}</span>;
@@ -284,7 +285,7 @@ function renderProgressCell(params, tab) {
 
 function renderHtmlProgressCell(params, tab) {
   if (params.row.pending && !params.value) {
-    return <DotSpinner className="dot-spinner" />;
+    return '';
   }
   if (params.row.error) {
     return <span style={{color:'red'}}>{params.row.error}</span>;
@@ -1270,7 +1271,7 @@ export default function App({ darkMode, setDarkMode }) {
 
   const audioRows = audios.map((a, i) => ({ id: i, ...a, _index: i }));
   const renderAudioCell = p => (
-    p.row.pending ? <DotSpinner className="dot-spinner" /> : (
+    p.row.pending ? '' : (
       <div>
         {p.row.error && <div style={{color:'red'}}>{p.row.error}</div>}
         {p.row.url && <audio controls src={p.row.url}></audio>}

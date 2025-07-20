@@ -49,3 +49,13 @@ th, td { border: 1px solid #ccc; padding: 0.25rem; }
   color:var(--mui-palette-primary-main,#2da44e);
   font-size:1.5rem
 }
+
+@keyframes rowPending {
+  0% { background-color: rgba(45,164,78,0.2); }
+  50% { background-color: rgba(45,164,78,0.05); }
+  100% { background-color: rgba(45,164,78,0.2); }
+}
+
+.pending-row {
+  animation: rowPending 1s linear infinite;
+}
