@@ -136,4 +136,10 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('localStorage.length')).toBe(true);
   });
+  it('formats model pricing', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('pricePerM')).toBe(true);
+    expect(code.includes("type: 'number'")).toBe(true);
+    expect(code.includes('1e6')).toBe(true);
+  });
 });
