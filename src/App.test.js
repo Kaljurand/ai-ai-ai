@@ -147,4 +147,13 @@ describe('App.jsx compilation', () => {
     expect(code.includes('getRowClassName')).toBe(true);
     expect(code.includes('pending-row')).toBe(true);
   });
+  it('syncs selected models with the URL', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('URLSearchParams')).toBe(true);
+    expect(code.includes('replaceState')).toBe(true);
+    expect(code.includes('textModels')).toBe(true);
+    expect(code.includes('ttsModels')).toBe(true);
+    expect(code.includes('asrModels')).toBe(true);
+    expect(code.includes("split('/').pop()")).toBe(true);
+  });
 });
