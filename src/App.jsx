@@ -629,27 +629,34 @@ export default function App({ darkMode, setDarkMode }) {
   const [storageInfo, setStorageInfo] = useState({ usage: 0, quota: 0 });
 
   useEffect(() => {
+    const parse = v => v.split(',').filter(Boolean).map(id => id.split('/').pop());
     const params = new URLSearchParams(window.location.search);
     const text = params.get('textModels');
     const tts = params.get('ttsModels');
     const asr = params.get('asrModels');
-    if (text) setSelectedTextModels(text.split(',').filter(Boolean));
-    if (tts) setSelectedTtsModels(tts.split(',').filter(Boolean));
-    if (asr) setSelectedAsrModels(asr.split(',').filter(Boolean));
+    if (text) setSelectedTextModels(parse(text));
+    if (tts) setSelectedTtsModels(parse(tts));
+    if (asr) setSelectedAsrModels(parse(asr));
   }, []);
 
   useEffect(() => {
+    const providerMap = {};
+    [...textModelsList, ...ttsModels, ...asrModels].forEach(m => {
+      if (m.provider) providerMap[m.id] = m.provider;
+    });
+    const format = ids => ids.map(id => `${providerMap[id] || 'openrouter'}/${id}`).join(',');
+
     const params = new URLSearchParams(window.location.search);
-    if (selectedTextModels.length) params.set('textModels', selectedTextModels.join(','));
+    if (selectedTextModels.length) params.set('textModels', format(selectedTextModels));
     else params.delete('textModels');
-    if (selectedTtsModels.length) params.set('ttsModels', selectedTtsModels.join(','));
+    if (selectedTtsModels.length) params.set('ttsModels', format(selectedTtsModels));
     else params.delete('ttsModels');
-    if (selectedAsrModels.length) params.set('asrModels', selectedAsrModels.join(','));
+    if (selectedAsrModels.length) params.set('asrModels', format(selectedAsrModels));
     else params.delete('asrModels');
     const q = params.toString();
     const url = q ? `${window.location.pathname}?${q}` : window.location.pathname;
     window.history.replaceState(null, '', url);
-  }, [selectedTextModels, selectedTtsModels, selectedAsrModels]);
+  }, [selectedTextModels, selectedTtsModels, selectedAsrModels, textModelsList, ttsModels, asrModels]);
 
   const predefinedPrompts = [
     'Generate 10 tongue twisters, each on a new line.',

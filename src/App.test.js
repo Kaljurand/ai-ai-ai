@@ -154,5 +154,6 @@ describe('App.jsx compilation', () => {
     expect(code.includes('textModels')).toBe(true);
     expect(code.includes('ttsModels')).toBe(true);
     expect(code.includes('asrModels')).toBe(true);
+    expect(code.includes("split('/').pop()")).toBe(true);
   });
 });
