@@ -628,6 +628,29 @@ export default function App({ darkMode, setDarkMode }) {
   const [logSize, setLogSize] = useStoredState('logSize', 100);
   const [storageInfo, setStorageInfo] = useState({ usage: 0, quota: 0 });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const text = params.get('textModels');
+    const tts = params.get('ttsModels');
+    const asr = params.get('asrModels');
+    if (text) setSelectedTextModels(text.split(',').filter(Boolean));
+    if (tts) setSelectedTtsModels(tts.split(',').filter(Boolean));
+    if (asr) setSelectedAsrModels(asr.split(',').filter(Boolean));
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (selectedTextModels.length) params.set('textModels', selectedTextModels.join(','));
+    else params.delete('textModels');
+    if (selectedTtsModels.length) params.set('ttsModels', selectedTtsModels.join(','));
+    else params.delete('ttsModels');
+    if (selectedAsrModels.length) params.set('asrModels', selectedAsrModels.join(','));
+    else params.delete('asrModels');
+    const q = params.toString();
+    const url = q ? `${window.location.pathname}?${q}` : window.location.pathname;
+    window.history.replaceState(null, '', url);
+  }, [selectedTextModels, selectedTtsModels, selectedAsrModels]);
+
   const predefinedPrompts = [
     'Generate 10 tongue twisters, each on a new line.',
     'Display the main content of <https://pohiseadus.ee/sisu/3554>.',
