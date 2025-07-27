@@ -34,10 +34,38 @@ function Root() {
           },
           MuiButton: {
             styleOverrides: {
-              root: {
+              root: ({ theme }) => ({
                 borderRadius: 6,
-                textTransform: 'none'
-              }
+                textTransform: 'none',
+                minWidth: 44,
+                minHeight: 44,
+                transition:
+                  'background-color 150ms, box-shadow 150ms, transform 100ms',
+                boxShadow:
+                  theme.palette.mode === 'dark'
+                    ? '0 1px 2px rgba(255,255,255,0.1)'
+                    : '0 1px 2px rgba(0,0,0,0.1)',
+                '&:hover': {
+                  boxShadow:
+                    theme.palette.mode === 'dark'
+                      ? '0 2px 6px rgba(255,255,255,0.2)'
+                      : '0 2px 6px rgba(0,0,0,0.2)'
+                },
+                '&:active': {
+                  transform: 'scale(0.97)',
+                  boxShadow:
+                    theme.palette.mode === 'dark'
+                      ? '0 1px 2px rgba(255,255,255,0.2)'
+                      : '0 1px 2px rgba(0,0,0,0.2)'
+                },
+                '&.Mui-focusVisible': {
+                  boxShadow: `0 0 0 2px ${theme.palette.primary.main}`
+                },
+                '&.Mui-disabled': {
+                  opacity: 0.5,
+                  boxShadow: 'none'
+                }
+              })
             }
           }
         }
