@@ -347,6 +347,30 @@ function ExportButtons({ rows, columns, name, t, children }) {
   );
 }
 
+function ResizableTextField({ heightKey, minRows, inputRef, onMouseUp, sx = {}, ...props }) {
+  const [height, setHeight] = useStoredState(heightKey, 0);
+  const ref = React.useRef();
+  const combinedRef = node => {
+    ref.current = node;
+    if (typeof inputRef === 'function') inputRef(node);
+    else if (inputRef) inputRef.current = node;
+  };
+  const handleMouseUp = e => {
+    if (ref.current) setHeight(ref.current.clientHeight);
+    if (onMouseUp) onMouseUp(e);
+  };
+  return (
+    <TextField
+      {...props}
+      multiline
+      minRows={minRows}
+      inputRef={combinedRef}
+      onMouseUp={handleMouseUp}
+      sx={{ '& textarea': { resize: 'vertical', ...(height ? { height } : {}) }, ...sx }}
+    />
+  );
+}
+
 const translations = {
   en: {
     appTitle: 'Speech Playground',
@@ -1531,10 +1555,10 @@ export default function App({ darkMode, setDarkMode }) {
       {view === 'text' && (
         <div className="content">
           <Tooltip title={expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
-            <TextField
+            <ResizableTextField
+              heightKey="textPromptHeight"
               label={t('promptForModels')}
-              multiline
-              rows={3}
+              minRows={3}
               value={textPrompt}
               onChange={e => setTextPrompt(e.target.value)}
               fullWidth
@@ -1588,10 +1612,10 @@ export default function App({ darkMode, setDarkMode }) {
       {view === 'audio' && (
         <div className="content">
           <Tooltip title={expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
-            <TextField
+            <ResizableTextField
+              heightKey="ttsMetaPromptHeight"
               label={t('metaPromptLabel')}
-              multiline
-              rows={2}
+              minRows={2}
               value={ttsMetaPrompt}
               onChange={e => setTtsMetaPrompt(e.target.value)}
               fullWidth
@@ -1620,10 +1644,10 @@ export default function App({ darkMode, setDarkMode }) {
             ))}
           </Menu>
           <Tooltip title={expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
-            <TextField
+            <ResizableTextField
+              heightKey="ttsPromptHeight"
               label={t('ttsPromptLabel')}
-              multiline
-              rows={4}
+              minRows={4}
               value={ttsPrompt}
               InputProps={{
                 readOnly: true,
@@ -1675,10 +1699,10 @@ export default function App({ darkMode, setDarkMode }) {
       {view === 'asr' && (
         <div className="content">
           <Tooltip title={expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt })} placement="top">
-            <TextField
+            <ResizableTextField
+              heightKey="asrPromptHeight"
               label={t('asrPromptLabel')}
-              multiline
-              rows={3}
+              minRows={3}
               value={asrPrompt}
               onChange={e => setAsrPrompt(e.target.value)}
               fullWidth
