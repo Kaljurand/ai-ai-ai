@@ -5,7 +5,11 @@ body {
   background-color: var(--mui-palette-background-default, #f6f8fa);
   color: var(--mui-palette-text-primary, #24292e);
 }
-textarea { width: 100%; height: 6rem; }
+textarea {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+}
 table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
 th, td { border: 1px solid #ccc; padding: 0.25rem; }
 .content {

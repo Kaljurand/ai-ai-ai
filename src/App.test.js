@@ -142,6 +142,13 @@ describe('App.jsx compilation', () => {
     expect(code.includes("type: 'number'")).toBe(true);
     expect(code.includes('1e6')).toBe(true);
   });
+  it('persists prompt textarea heights', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('textPromptHeight')).toBe(true);
+    expect(code.includes('ttsMetaPromptHeight')).toBe(true);
+    expect(code.includes('ttsPromptHeight')).toBe(true);
+    expect(code.includes('asrPromptHeight')).toBe(true);
+  });
   it('adds pending-row class to pending rows', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('getRowClassName')).toBe(true);
