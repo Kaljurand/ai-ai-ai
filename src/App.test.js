@@ -154,4 +154,13 @@ describe('App.jsx compilation', () => {
     expect(code.includes('getRowClassName')).toBe(true);
     expect(code.includes('pending-row')).toBe(true);
   });
+  it('links tabs using anchors', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('href={`#${ti.value}`}')).toBe(true);
+  });
+  it('syncs tab state with location hash', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('window.history.replaceState')).toBe(true);
+    expect(code.includes('hashchange')).toBe(true);
+  });
 });

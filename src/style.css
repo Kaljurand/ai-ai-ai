@@ -7,7 +7,7 @@ body {
 }
 textarea {
   width: 100%;
-  min-height: 6rem;
+  min-height: 3rem;
   resize: vertical;
 }
 table { border-collapse: collapse; width: 100%; margin-top: 1rem; }

@@ -347,7 +347,7 @@ function ExportButtons({ rows, columns, name, t, children }) {
   );
 }
 
-function ResizableTextField({ heightKey, minRows, inputRef, onMouseUp, sx = {}, ...props }) {
+function ResizableTextField({ heightKey, minRows = 2, inputRef, onMouseUp, sx = {}, ...props }) {
   const [height, setHeight] = useStoredState(heightKey, 0);
   const ref = React.useRef();
   const combinedRef = node => {
@@ -634,7 +634,11 @@ export default function App({ darkMode, setDarkMode }) {
   const [instrAnchor, setInstrAnchor] = useState(null);
   const [asrPromptAnchor, setAsrPromptAnchor] = useState(null);
 
-  const [view, setView] = useState('audio');
+  const tabValues = ['text', 'audio', 'asr', 'log', 'models', 'config'];
+  const [view, setView] = useState(() => {
+    const hash = window.location.hash.slice(1);
+    return tabValues.includes(hash) ? hash : 'audio';
+  });
   const [ttsModels, setTtsModels] = useState([
     { id: 'gpt-4o-mini-tts', name: 'gpt-4o-mini-tts', cost: '', provider: 'openai' }
   ]);
@@ -678,6 +682,21 @@ export default function App({ darkMode, setDarkMode }) {
     'Assume the following audio was spoken by a non-native speaker.',
     'The transcription of the following audio is {tab-asr.input-text}. Do not use this text during transcription, but when writing out the final transcription, only include the words that were misrecognized.'
   ];
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const h = window.location.hash.slice(1);
+      if (tabValues.includes(h)) setView(h);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash.slice(1) !== view) {
+      window.history.replaceState(null, '', '#' + view);
+    }
+  }, [view]);
 
   useEffect(() => {
     const handler = e => {
@@ -1514,6 +1533,8 @@ export default function App({ darkMode, setDarkMode }) {
               const tabEl = (
                 <Tab
                   key={ti.value}
+                  component="a"
+                  href={`#${ti.value}`}
                   value={ti.value}
                   label={isSmall ? '' : ti.label}
                   icon={isSmall ? ti.icon : undefined}
@@ -1534,7 +1555,12 @@ export default function App({ darkMode, setDarkMode }) {
               </IconButton>
               <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
                 {extraTabs.map(ti => (
-                  <MenuItem key={ti.value} onClick={() => { setView(ti.value); setMenuAnchor(null); }}>
+                  <MenuItem
+                    key={ti.value}
+                    component="a"
+                    href={`#${ti.value}`}
+                    onClick={() => { setView(ti.value); setMenuAnchor(null); }}
+                  >
                     {ti.label}
                   </MenuItem>
                 ))}
@@ -1558,7 +1584,7 @@ export default function App({ darkMode, setDarkMode }) {
             <ResizableTextField
               heightKey="textPromptHeight"
               label={t('promptForModels')}
-              minRows={3}
+              minRows={2}
               value={textPrompt}
               onChange={e => setTextPrompt(e.target.value)}
               fullWidth
@@ -1647,7 +1673,7 @@ export default function App({ darkMode, setDarkMode }) {
             <ResizableTextField
               heightKey="ttsPromptHeight"
               label={t('ttsPromptLabel')}
-              minRows={4}
+              minRows={2}
               value={ttsPrompt}
               InputProps={{
                 readOnly: true,
@@ -1702,7 +1728,7 @@ export default function App({ darkMode, setDarkMode }) {
             <ResizableTextField
               heightKey="asrPromptHeight"
               label={t('asrPromptLabel')}
-              minRows={3}
+              minRows={2}
               value={asrPrompt}
               onChange={e => setAsrPrompt(e.target.value)}
               fullWidth
