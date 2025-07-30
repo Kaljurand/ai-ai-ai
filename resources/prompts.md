@@ -6,10 +6,12 @@ System prompt: Generate a text to be used as input for TTS. Do not act as a chat
 
 ### Prompts
 
+- Create a short (~5 sentences) technical text that contains lots of numbers and abbreviations that are typically never written the way they are spoken, e.g. decimal numbers and measurement units. The topic of the text should be house wall materials, U-value, kWh/m²/year.
+- Make a funny and short kids poem about combing the hair. Use word play with words and phrases like: "kamm on?", "come on!", "kammitud" (which has 2 meanings: being combed, being without comb), other forms and compounds of "kamm" ("kammeljas", "kammloom", ...) that don't necessarily have anything to do with combing the hair. Be inspired by poets like Laaban, Ehin, Trull, Pehk.
 - For a different typical Estonian animal up to 20 animals: write what does it say in Estonian in the form "animal name: animal sound, newline", without any explanations nor translations.
-- Generate 10 tongue twisters, each on a new line, without explanations nor translations. Include the following and use them for inspiration: "Kuuuurija istus töööös jääääres.", "Aoäia õe uue oaõieaia õueaua ööau.", "Anna õlu üle Ülo õe õla.".
+- Provide driving directions from Vabaõhumuuseumi tee 12 to Toom-Kooli tn 6.
+- Generate 10 tongue twisters, each on a new line. Include the following and use them for inspiration for the others: "Kuuuurija istus töööös jääääres.", "Aoäia õe uue oaõieaia õueaua ööau.", "Anna õlu üle Ülo õe õla.".
 - Display the main content of <https://pohiseadus.ee/sisu/3554>.
-- Write an Estonian haiku in the style of Jaan Pehk.
 - Write an Estonian sports report, for example: "Eesti esireket Mark Lajal (ATP 167.) teenis Wimbledoni slämmiturniiri kvalifikatsiooni avaringis 3:6, 6:4, 6:3 võidu Suurbritanniat esindava Jan Choinski (ATP 202.) üle."
 - List all Estonian prime ministers in the order they took office. Only provide the names, separated by commas.
 - Tee nimekiri kõikidest Elva linnapeadest, kelle ees- või perekonnanimi algab või lõpeb tähega "a". Esita tulemused Markdown-tabelina.
