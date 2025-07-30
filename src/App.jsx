@@ -1342,9 +1342,9 @@ export default function App({ darkMode, setDarkMode }) {
     )
   );
   const audioColumns = [
+    { field: 'id', headerName: t('audioId'), width: 70, valueGetter: p => (p.row && p.row.id != null ? p.row.id + 1 : ''), renderCell: p => renderCell(p, 'tab_audio') },
     { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_audio') },
-    { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell: p => renderCell(p, 'tab_audio') },
-    { field: 'provider', headerName: t('source'), width: 120, renderCell: p => renderCell(p, 'tab_audio') },
+    { field: 'audio', headerName: t('audio'), flex: 1, sortComparator: (a,b,c,d) => (c?.row?.duration ?? 0) - (d?.row?.duration ?? 0), renderCell: renderAudioCell },
     {
       field: 'text',
       headerName: t('text'),
@@ -1352,7 +1352,8 @@ export default function App({ darkMode, setDarkMode }) {
       valueGetter: p => (p && p.row && p.row.index != null ? (texts[p.row.index]?.text || '') : ''),
       renderCell: p => renderCell(p, 'tab_audio')
     },
-    { field: 'audio', headerName: t('audio'), flex: 1, sortComparator: (a,b,c,d) => (c?.row?.duration ?? 0) - (d?.row?.duration ?? 0), renderCell: renderAudioCell },
+    { field: 'provider', headerName: t('source'), width: 120, renderCell: p => renderCell(p, 'tab_audio') },
+    { field: 'index', headerName: t('textId'), width: 80, valueGetter: p => (p.row && p.row.index != null ? p.row.index + 1 : ''), renderCell: p => renderCell(p, 'tab_audio') },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 160,
       renderCell: params => (
@@ -1374,15 +1375,15 @@ export default function App({ darkMode, setDarkMode }) {
 
   const resultRows = rows.map((r, idx) => ({ id: idx, ...r, _index: idx }));
   const resultColumns = [
-    { field: 'i', headerName: t('transcriptId'), width: 70, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'id', headerName: t('transcriptId'), width: 70, valueGetter: p => (p.row && p.row.id != null ? p.row.id + 1 : ''), renderCell: p => renderCell(p, 'tab_asr') },
     { field: 'timestamp', headerName: t('timestamp'), width: 180, renderCell: p => renderCell(p, 'tab_asr') },
+    { field: 'transcription', headerName: t('transcript'), flex: 1, renderCell: p => renderProgressCell(p, 'tab_asr') },
+    { field: 'diff', headerName: t('diff'), flex: 1, renderCell: p => renderHtmlProgressCell(p, 'tab_asr') },
+    { field: 'wer', headerName: t('wer'), width: 90, renderCell: p => renderProgressCell(p, 'tab_asr') },
+    { field: 'original', headerName: t('originalText'), flex: 1, renderCell: p => renderCell(p, 'tab_asr') },
     { field: 'textSource', headerName: t('textSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
     { field: 'audioSource', headerName: t('audioSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
     { field: 'asrSource', headerName: t('asrSource'), width: 120, renderCell: p => renderCell(p, 'tab_asr') },
-    { field: 'original', headerName: t('originalText'), flex: 1, renderCell: p => renderCell(p, 'tab_asr') },
-    { field: 'transcription', headerName: t('transcript'), flex: 1, renderCell: p => renderProgressCell(p, 'tab_asr') },
-    { field: 'wer', headerName: t('wer'), width: 90, renderCell: p => renderProgressCell(p, 'tab_asr') },
-    { field: 'diff', headerName: t('diff'), flex: 1, renderCell: p => renderHtmlProgressCell(p, 'tab_asr') },
     {
       field: 'actions', headerName: t('actions'), sortable: false, filterable: false, width: 90,
       renderCell: params => (
@@ -1631,6 +1632,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={textRows}
             columns={textColumns}
             t={t}
+            initialCols={{ id: false }}
             initialSort={[{ field: 'timestamp', sort: 'desc' }]}
           />
         </div>
@@ -1717,6 +1719,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={audioRows}
             columns={audioColumns}
             t={t}
+            initialCols={{ id: false }}
             initialSort={[{ field: 'timestamp', sort: 'desc' }]}
           />
           {status && <p>{status}</p>}
@@ -1779,6 +1782,7 @@ export default function App({ darkMode, setDarkMode }) {
             rows={resultRows}
             columns={resultColumns}
             t={t}
+            initialCols={{ id: false }}
             initialSort={[{ field: 'timestamp', sort: 'desc' }]}
           />
           {status && <p>{status}</p>}
