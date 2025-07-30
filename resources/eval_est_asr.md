@@ -8,9 +8,9 @@ The purpose of the tool is to evaluate various ASR (Automatic Speech Recognition
 
 This input specification includes:
 
-- Text generation models and prompts
-- Text-to-speech models and prompts
-- Audio transcription models and prompts
+- text generation models and prompts
+- text-to-speech models and prompts
+- audio transcription models and prompts
 
 An example specification is provided in the following sections, where each section lists one or more models (in the Models section), exactly one meta prompt, and zero or more prompts (as subsections under Prompts, if present). All possible combinations should be generated. The "meta prompt" must be used as the instruction or system prompt; but if the provider does not support this, it should be prepended to each prompt.
 
@@ -116,3 +116,5 @@ Also use the WER tool to calculate the word-error-rate. Report the result as JSO
 
 - wer
 - text of evaluation
+
+Your response MUST be valid JSON and contain ONLY the JSON object.
