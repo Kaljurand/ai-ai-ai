@@ -122,6 +122,12 @@ describe('App.jsx compilation', () => {
     expect(code.includes('predefinedAsrPrompts')).toBe(true);
     expect(code.includes('Assume the following audio was spoken by a non-native speaker.')).toBe(true);
   });
+  it('includes system prompt settings', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('textSystemPromptLabel')).toBe(true);
+    expect(code.includes('ttsSystemPromptLabel')).toBe(true);
+    expect(code.includes('asrSystemPromptLabel')).toBe(true);
+  });
   it('clamps table cell text to three lines', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('WebkitLineClamp: 3')).toBe(true);
