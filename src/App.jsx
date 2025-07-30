@@ -423,6 +423,7 @@ const translations = {
     resetUi: 'Reset UI state',
     keysGroup: 'Keys',
     uiGroup: 'UI',
+    systemGroup: 'System prompts',
     storageGroup: 'Storage',
     openaiKey: 'OpenAI API key',
     googleKey: 'Google API key',
@@ -447,7 +448,10 @@ const translations = {
     pricing: 'Pricing',
     duration: 'Duration',
     logSize: 'Log rows',
-    storageUsage: 'Storage used'
+    storageUsage: 'Storage used',
+    textSystemPromptLabel: 'Text system prompt',
+    ttsSystemPromptLabel: 'Audio system prompt',
+    asrSystemPromptLabel: 'ASR system prompt'
   },
   et: {
     appTitle: 'K\u00f5ne m\u00e4nguplats',
@@ -500,6 +504,7 @@ const translations = {
     resetUi: 'Taasta liidese olek',
     keysGroup: 'Võtmed',
     uiGroup: 'Kasutajaliides',
+    systemGroup: 'Süsteemi promptid',
     storageGroup: 'Salvestus',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
@@ -524,7 +529,10 @@ const translations = {
     pricing: 'Hind',
     duration: 'Kestus',
     logSize: 'Logi ridade arv',
-    storageUsage: 'Kasutatud salvestus'
+    storageUsage: 'Kasutatud salvestus',
+    textSystemPromptLabel: 'Teksti süsteemi-prompt',
+    ttsSystemPromptLabel: 'Heli süsteemi-prompt',
+    asrSystemPromptLabel: 'ASR süsteemi-prompt'
   },
   vro: {
     appTitle: 'K\u00f5n\u00f5 m\u00e4nguplats',
@@ -575,6 +583,7 @@ const translations = {
     clearData: 'Puhasta andmed',
     clearKeys: 'Puhasta võtmid',
     resetUi: 'Taasta liidese olõk',
+    systemGroup: 'Süstemi promptid',
     openaiKey: 'OpenAI API v\u00f5ti',
     googleKey: 'Google API v\u00f5ti',
     openrouterKey: 'OpenRouter API v\u00f5ti',
@@ -599,7 +608,10 @@ const translations = {
     pricing: 'Hind',
     duration: 'Kestus',
     logSize: 'Logi ridadõ arv',
-    storageUsage: 'Kasutatu salvestus'
+    storageUsage: 'Kasutatu salvestus',
+    textSystemPromptLabel: 'Tekstü süstem-prompt',
+    ttsSystemPromptLabel: 'Hääli süstem-prompt',
+    asrSystemPromptLabel: 'ASR süstem-prompt'
   }
 };
 
@@ -625,11 +637,14 @@ export default function App({ darkMode, setDarkMode }) {
   const [openAiModel, setOpenAiModel] = useStoredState('openAiModel', 'gpt-3.5-turbo');
   const [googleModel, setGoogleModel] = useStoredState('googleModel', '');
   const [textPrompt, setTextPrompt] = useStoredState('textPrompt', 'Generate a realistic Estonian weather report');
+  const [textSystemPrompt, setTextSystemPrompt] = useStoredState('textSystemPrompt', 'Generate an Estonian text to be used as input for TTS. Guidelines:\n- Do not act as or use a chat model.\n- Only generate the text itself, without any explanations or extra scaffolding.\n- You may use Markdown formatting and Elevenlabs-style meta-tags such as "[whispers]".');
   const [selectedTextModels, setSelectedTextModels] = useStoredState('selectedTextModels', []);
   const [selectedTextId, setSelectedTextId] = useState(null);
   const [selectedAudioId, setSelectedAudioId] = useState(null);
   const [ttsPrompt, setTtsPrompt] = useStoredState('ttsPrompt', 'Use an Estonian female voice');
+  const [ttsSystemPrompt, setTtsSystemPrompt] = useStoredState('ttsSystemPrompt', 'The text is in Estonian, but may contain foreign words, which should be pronounced with an Estonian accent. The text may also include "voice tags" such as "[whispers]". Expand all abbreviations before speaking; for example, "25 km/h-ni" should be read as "kahek\u00fcmne viie kilomeetrini tunnis" to improve clarity.');
   const [asrPrompt, setAsrPrompt] = useStoredState('asrPrompt', 'Transcribe the speech to Estonian text with punctuation');
+  const [asrSystemPrompt, setAsrSystemPrompt] = useStoredState('asrSystemPrompt', 'Transcribe this Estonian audio. Add punctuation marks. Use standard orthography (write numbers as digits and use common abbreviations).');
   const [promptAnchor, setPromptAnchor] = useState(null);
   const [instrAnchor, setInstrAnchor] = useState(null);
   const [asrPromptAnchor, setAsrPromptAnchor] = useState(null);
@@ -657,9 +672,12 @@ export default function App({ darkMode, setDarkMode }) {
   const [storageInfo, setStorageInfo] = useState({ usage: 0, quota: 0 });
 
   const predefinedPrompts = [
-    'Generate 10 tongue twisters, each on a new line.',
+    'Create a short (~5 sentences) technical text that contains lots of numbers and abbreviations that are typically never written the way they are spoken, e.g. decimal numbers and measurement units. The topic of the text should be house wall materials, U-value, kWh/m\u00b2/year.',
+    'Make a funny and short kids poem about combing the hair. Use word play with words and phrases like: "kamm on?", "come on!", "kammitud" (which has 2 meanings: being combed, being without comb), other forms and compounds of "kamm" ("kammeljas", "kammloom", ...) that don\u2019t necessarily have anything to do with combing the hair. Be inspired by poets like Laaban, Ehin, Trull, Pehk.',
+    'For a different typical Estonian animal up to 20 animals: write what does it say in Estonian in the form "animal name: animal sound, newline", without any explanations nor translations.',
+    'Provide driving directions from Vaba\u00f5humuuseumi tee 12 to Toom-Kooli tn 6.',
+    'Generate 10 tongue twisters, each on a new line. Include the following and use them for inspiration for the others: "Kuuuurija istus t\u00f6\u00f6\u00f6s j\u00e4\u00e4\u00e4\u00e4res.", "Ao\u00e4ia \u00f5e uue oa\u00f5ieaia \u00f5ueaua \u00f6\u00f6au.", "Anna \u00f5lu \u00fcle \u00dclo \u00f5e \u00f5la.".',
     'Display the main content of <https://pohiseadus.ee/sisu/3554>.',
-    'Write an Estonian haiku in the style of Jaan Pehk.',
     'Write an Estonian sports report, for example: "Eesti esireket Mark Lajal (ATP 167.) teenis Wimbledoni sl\u00e4mmiturniiri kvalifikatsiooni avaringis 3:6, 6:4, 6:3 v\u00f5idu Suurbritanniat esindava Jan Choinski (ATP 202.) \u00fcle."',
     'List all Estonian prime ministers in the order they took office. Only provide the names, separated by commas.',
     'Tee nimekiri k\u00f5ikidest Elva linnapeadest, kelle ees- v\u00f5i perekonnanimi algab v\u00f5i l\u00f5peb t\u00e4hega "a". Esita tulemused Markdown-tabelina.',
@@ -1097,9 +1115,10 @@ export default function App({ darkMode, setDarkMode }) {
           const orModel = openRouterMap[model].id;
           const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
           const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const fullInstr = ttsSystemPrompt ? `${ttsSystemPrompt} ${instr}` : instr;
           const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/speech', { model: orModel, input }, model, cost);
           try {
-            const blob = await openRouterTts(orModel, input, instr, apiKeys.openrouter, fetchWithLoading);
+            const blob = await openRouterTts(orModel, input, fullInstr, apiKeys.openrouter, fetchWithLoading);
             finishLog(log, { model, data: '<bytes>' }, cost);
             const data = await blobToDataUrl(blob);
             const duration = await audioDuration(data);
@@ -1112,9 +1131,10 @@ export default function App({ darkMode, setDarkMode }) {
         } else if (openAiModels.includes(model)) {
           const input = expandRefs(ttsPrompt, { texts, audios, textPrompt, ttsPrompt });
           const instr = expandRefs(ttsMetaPrompt, { texts, audios, textPrompt, ttsPrompt });
+          const fullInstr = ttsSystemPrompt ? `${ttsSystemPrompt} ${instr}` : instr;
           const log = startLog('POST', 'https://api.openai.com/v1/audio/speech', { model, input }, model, cost);
           try {
-            const blob = await openAiTts(model, input, instr, apiKeys.openai, fetchWithLoading);
+            const blob = await openAiTts(model, input, fullInstr, apiKeys.openai, fetchWithLoading);
             finishLog(log, { model, data: '<bytes>' }, cost);
             const data = await blobToDataUrl(blob);
             const duration = await audioDuration(data);
@@ -1125,8 +1145,9 @@ export default function App({ darkMode, setDarkMode }) {
             setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, timestamp: endTime(), pending:false, error: e.message }:v));
           }
         } else {
-          const log = startLog('TTS', model, fullPrompt, model, cost);
-          const blob = new Blob([`${model}:${fullPrompt}`], { type: 'audio/plain' });
+          const mockPrompt = ttsSystemPrompt ? `${ttsSystemPrompt} ${fullPrompt}` : fullPrompt;
+          const log = startLog('TTS', model, mockPrompt, model, cost);
+          const blob = new Blob([`${model}:${mockPrompt}`], { type: 'audio/plain' });
           const data = await blobToDataUrl(blob);
           const duration = await audioDuration(data);
           setAudios(a => a.map((v,i)=>i===rowIndex?{ ...v, url: data, data, duration, timestamp: endTime(), pending:false }:v));
@@ -1156,9 +1177,10 @@ export default function App({ darkMode, setDarkMode }) {
         if (openRouterMap[model]) {
           const orModel = openRouterMap[model].id;
           const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+          const fullPrompt = asrSystemPrompt ? `${asrSystemPrompt} ${prompt}` : prompt;
           const log = startLog('POST', 'https://openrouter.ai/api/v1/audio/transcriptions', { model: orModel }, model);
           try {
-            const data = await openRouterTranscribe(orModel, blob, prompt, apiKeys.openrouter, fetchWithLoading);
+            const data = await openRouterTranscribe(orModel, blob, fullPrompt, apiKeys.openrouter, fetchWithLoading);
             finishLog(log, data);
             const text = data.text?.trim();
             if (text) finish(text);
@@ -1170,9 +1192,10 @@ export default function App({ darkMode, setDarkMode }) {
           }
         } else if (mistralModels.includes(model)) {
           const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+          const fullPrompt = asrSystemPrompt ? `${asrSystemPrompt} ${prompt}` : prompt;
           const log = startLog('POST', 'https://api.mistral.ai/v1/audio/transcriptions', { model }, model);
           try {
-            const data = await mistralTranscribe(model, blob, prompt, apiKeys.mistral, fetchWithLoading);
+            const data = await mistralTranscribe(model, blob, fullPrompt, apiKeys.mistral, fetchWithLoading);
             finishLog(log, data);
             const text = data.text?.trim();
             if (text) finish(text);
@@ -1184,9 +1207,10 @@ export default function App({ darkMode, setDarkMode }) {
           }
         } else if (openAiModels.includes(model)) {
           const prompt = asrPrompt ? expandRefs(asrPrompt, { texts, audios, textPrompt, ttsPrompt }) : '';
+          const fullPrompt = asrSystemPrompt ? `${asrSystemPrompt} ${prompt}` : prompt;
           const log = startLog('POST', 'https://api.openai.com/v1/audio/transcriptions', { model }, model);
           try {
-            const data = await openAiTranscribe(model, blob, prompt, apiKeys.openai, fetchWithLoading);
+            const data = await openAiTranscribe(model, blob, fullPrompt, apiKeys.openai, fetchWithLoading);
             finishLog(log, data);
             const text = data.text?.trim();
             if (text) finish(text);
@@ -1885,6 +1909,34 @@ export default function App({ darkMode, setDarkMode }) {
             <MenuItem value="et">Eesti</MenuItem>
             <MenuItem value="vro">V\u00f5ro</MenuItem>
           </Select>
+          <Divider textAlign="left" sx={{ my: 2 }}>{t('systemGroup')}</Divider>
+          <TextField
+            label={t('textSystemPromptLabel')}
+            multiline
+            minRows={2}
+            value={textSystemPrompt}
+            onChange={e => setTextSystemPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label={t('ttsSystemPromptLabel')}
+            multiline
+            minRows={2}
+            value={ttsSystemPrompt}
+            onChange={e => setTtsSystemPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label={t('asrSystemPromptLabel')}
+            multiline
+            minRows={2}
+            value={asrSystemPrompt}
+            onChange={e => setAsrSystemPrompt(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
           <Divider textAlign="left" sx={{ my: 2 }}>{t('storageGroup')}</Divider>
           <Box sx={{ mb: 1 }}>
             <TextField
