@@ -1011,9 +1011,11 @@ export default function App({ darkMode, setDarkMode }) {
       });
       return (async () => {
         const endTime = () => new Date().toISOString();
+        const prompt = expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt });
+        const fullPrompt = textSystemPrompt ? `${textSystemPrompt} ${prompt}` : prompt;
         if (openRouterMap[model]) {
           const orModel = openRouterMap[model].id;
-          const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
+          const body = [{ role: 'user', content: fullPrompt }];
           const log = startLog('POST', 'https://openrouter.ai/api/v1/chat/completions', body, model);
           try {
             const data = await openRouterChat(orModel, body, apiKeys.openrouter, fetchWithLoading);
@@ -1027,10 +1029,9 @@ export default function App({ darkMode, setDarkMode }) {
             setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, timestamp: endTime(), pending:false, error: e.message }:v));
           }
         } else if (googleModels.includes(model)) {
-          const prompt = expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt });
-          const log = startLog('POST', 'google generate', prompt, model);
+          const log = startLog('POST', 'google generate', fullPrompt, model);
           try {
-            const data = await googleGenerateText(model, prompt, apiKeys.google, fetchWithLoading);
+            const data = await googleGenerateText(model, fullPrompt, apiKeys.google, fetchWithLoading);
             finishLog(log, data);
             const text = data.candidates?.[0]?.output?.trim();
             if (text) setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, text, timestamp: endTime(), pending:false }:v));
@@ -1041,7 +1042,7 @@ export default function App({ darkMode, setDarkMode }) {
             setTexts(t => t.map((v,i)=>i===rowIndex?{ ...v, timestamp: endTime(), pending:false, error: e.message }:v));
           }
         } else {
-          const body = [{ role: 'user', content: expandRefs(textPrompt, { texts, audios, textPrompt, ttsPrompt }) }];
+          const body = [{ role: 'user', content: fullPrompt }];
           const log = startLog('POST', 'https://api.openai.com/v1/chat/completions', body, model);
           try {
             const data = await openAiChat(model, body, apiKeys.openai, fetchWithLoading);
