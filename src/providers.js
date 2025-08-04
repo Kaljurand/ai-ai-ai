@@ -119,3 +119,46 @@ export async function mistralTranscribe(model, fileBlob, prompt = '', apiKey, fe
   if (!res.ok) throw new Error('Transcription failed');
   return res.json();
 }
+
+export async function fetchOpenAiCredits(apiKey, fetchFn = fetch) {
+  const url = 'https://api.openai.com/v1/dashboard/billing/credit_grants';
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  const res = await fetchFn(url, { headers });
+  if (!res.ok) throw new Error('Failed to fetch OpenAI credits');
+  const data = await res.json();
+  return data.total_available ?? null;
+}
+
+export async function fetchGoogleCredits(apiKey, fetchFn = fetch) {
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/creditGrants?key=${apiKey}`;
+    const res = await fetchFn(url);
+    if (!res.ok) throw new Error('Failed to fetch Google credits');
+    const data = await res.json();
+    return data.total_available ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchOpenRouterCredits(apiKey, fetchFn = fetch) {
+  const url = 'https://openrouter.ai/api/v1/user';
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  const res = await fetchFn(url, { headers });
+  if (!res.ok) throw new Error('Failed to fetch OpenRouter credits');
+  const data = await res.json();
+  return data.credits ?? data.data?.credits ?? null;
+}
+
+export async function fetchMistralCredits(apiKey, fetchFn = fetch) {
+  try {
+    const url = 'https://api.mistral.ai/v1/credits';
+    const headers = { 'Authorization': `Bearer ${apiKey}` };
+    const res = await fetchFn(url, { headers });
+    if (!res.ok) throw new Error('Failed to fetch Mistral credits');
+    const data = await res.json();
+    return data.credits ?? null;
+  } catch {
+    return null;
+  }
+}

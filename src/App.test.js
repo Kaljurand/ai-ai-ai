@@ -146,6 +146,13 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('localStorage.length')).toBe(true);
   });
+  it('fetches and displays API credits', () => {
+    const app = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(app.includes("credits: 'Credits'" )).toBe(true);
+    expect(app.includes('fetchOpenAiCredits')).toBe(true);
+    const providers = fs.readFileSync('src/providers.js', 'utf8');
+    expect(providers.includes('fetchOpenAiCredits')).toBe(true);
+  });
   it('formats model pricing', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('pricePerM')).toBe(true);

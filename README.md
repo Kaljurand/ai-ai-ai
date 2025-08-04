@@ -29,6 +29,7 @@ npm test
 
 - Generate Estonian texts via OpenAI, Google or OpenRouter APIs.
 - API keys and available models for each provider can be entered in the UI. Model lists and pricing are fetched from OpenRouter whenever possible.
+- Remaining credits for each API key are shown in the Settings tab and refresh whenever the tab is opened.
 - Synthesize text to audio using TTS APIs.
 - Transcribe audio back to text using the selected ASR models.
 - Compute the Word Error Rate (WER) between the generated text and transcription.
