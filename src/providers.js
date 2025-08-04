@@ -142,12 +142,22 @@ export async function fetchGoogleCredits(apiKey, fetchFn = fetch) {
 }
 
 export async function fetchOpenRouterCredits(apiKey, fetchFn = fetch) {
-  const url = 'https://openrouter.ai/api/v1/user';
-  const headers = { Authorization: `Bearer ${apiKey}` };
-  const res = await fetchFn(url, { headers });
-  if (!res.ok) throw new Error('Failed to fetch OpenRouter credits');
-  const data = await res.json();
-  return data.credits ?? data.data?.credits ?? null;
+  try {
+    const url = 'https://openrouter.ai/api/v1/limits';
+    const headers = { Authorization: `Bearer ${apiKey}` };
+    const res = await fetchFn(url, { headers });
+    if (!res.ok) throw new Error('Failed to fetch OpenRouter credits');
+    const data = await res.json();
+    return (
+      data.data?.credits?.remaining ??
+      data.data?.credit?.remaining ??
+      data.credits?.remaining ??
+      data.credits ??
+      null
+    );
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchMistralCredits(apiKey, fetchFn = fetch) {
