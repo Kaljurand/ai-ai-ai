@@ -62,10 +62,7 @@ import {
   openRouterTranscribe,
   openAiTranscribe,
   mistralTranscribe,
-  fetchOpenAiCredits,
-  fetchGoogleCredits,
-  fetchOpenRouterCredits,
-  fetchMistralCredits
+  fetchOpenRouterCredits
 } from './providers';
 
 import useStoredState from "./useStoredState";
@@ -630,7 +627,7 @@ function useTranslation() {
 
 export default function App({ darkMode, setDarkMode }) {
   const [apiKeys, setApiKeys] = useStoredState('apiKeys', { openai: '', google: '', openrouter: '', mistral: '' });
-  const [credits, setCredits] = useState({ openai: null, google: null, openrouter: null, mistral: null });
+  const [openRouterCredits, setOpenRouterCredits] = useState(null);
   const { t, lang, setLang } = useTranslation();
   const [texts, setTexts] = useStoredState('texts', []);
   const [audios, setAudios] = useStoredState('audios', []);
@@ -768,55 +765,20 @@ export default function App({ darkMode, setDarkMode }) {
   useEffect(() => {
     if (view !== 'config') return;
     (async () => {
-      const info = { openai: null, google: null, openrouter: null, mistral: null };
-
-      if (apiKeys.openai) {
-        const log = startLog('GET', 'https://api.openai.com/v1/dashboard/billing/credit_grants', '', 'openai');
-        try {
-          const { remaining, raw } = await fetchOpenAiCredits(apiKeys.openai, fetchWithLoading);
-          info.openai = remaining;
-          finishLog(log, raw);
-        } catch (e) {
-          finishLog(log, { error: e.message });
-        }
-      }
-
-      if (apiKeys.google) {
-        const log = startLog('GET', 'https://generativelanguage.googleapis.com/v1beta/creditGrants', '', 'google');
-        try {
-          const { remaining, raw } = await fetchGoogleCredits(apiKeys.google, fetchWithLoading);
-          info.google = remaining;
-          finishLog(log, raw);
-        } catch (e) {
-          finishLog(log, { error: e.message });
-        }
-      }
-
+      let remaining = null;
       if (apiKeys.openrouter) {
         const log = startLog('GET', 'https://openrouter.ai/api/v1/key', '', 'openrouter');
         try {
-          const { remaining, raw } = await fetchOpenRouterCredits(apiKeys.openrouter, fetchWithLoading);
-          info.openrouter = remaining;
+          const { remaining: rem, raw } = await fetchOpenRouterCredits(apiKeys.openrouter, fetchWithLoading);
+          remaining = rem;
           finishLog(log, raw);
         } catch (e) {
           finishLog(log, { error: e.message });
         }
       }
-
-      if (apiKeys.mistral) {
-        const log = startLog('GET', 'https://api.mistral.ai/v1/credits', '', 'mistral');
-        try {
-          const { remaining, raw } = await fetchMistralCredits(apiKeys.mistral, fetchWithLoading);
-          info.mistral = remaining;
-          finishLog(log, raw);
-        } catch (e) {
-          finishLog(log, { error: e.message });
-        }
-      }
-
-      setCredits(info);
+      setOpenRouterCredits(remaining);
     })();
-  }, [view, apiKeys.openai, apiKeys.google, apiKeys.openrouter, apiKeys.mistral]);
+  }, [view, apiKeys.openrouter]);
 
   const textModelsList = [
     ...openRouterModels
@@ -1916,13 +1878,6 @@ export default function App({ darkMode, setDarkMode }) {
             onChange={e => setApiKeys({ ...apiKeys, openai: e.target.value })}
             fullWidth
             margin="normal"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <Typography variant="caption">{t('credits')}: {fmtCredits(credits.openai)}</Typography>
-                </InputAdornment>
-              )
-            }}
           />
           <Typography variant="caption" sx={{ ml: 1 }}>
             <Link href={t('openaiKeyUrl')} target="_blank" rel="noopener">
@@ -1936,13 +1891,6 @@ export default function App({ darkMode, setDarkMode }) {
             onChange={e => setApiKeys({ ...apiKeys, google: e.target.value })}
             fullWidth
             margin="normal"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <Typography variant="caption">{t('credits')}: {fmtCredits(credits.google)}</Typography>
-                </InputAdornment>
-              )
-            }}
           />
           <Typography variant="caption" sx={{ ml: 1 }}>
             <Link href={t('googleKeyUrl')} target="_blank" rel="noopener">
@@ -1959,7 +1907,7 @@ export default function App({ darkMode, setDarkMode }) {
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <Typography variant="caption">{t('credits')}: {fmtCredits(credits.openrouter)}</Typography>
+                  <Typography variant="caption">{t('credits')}: {fmtCredits(openRouterCredits)}</Typography>
                 </InputAdornment>
               )
             }}
@@ -1976,13 +1924,6 @@ export default function App({ darkMode, setDarkMode }) {
             onChange={e => setApiKeys({ ...apiKeys, mistral: e.target.value })}
             fullWidth
             margin="normal"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <Typography variant="caption">{t('credits')}: {fmtCredits(credits.mistral)}</Typography>
-                </InputAdornment>
-              )
-            }}
           />
           <Typography variant="caption" sx={{ ml: 1 }}>
             <Link href={t('mistralKeyUrl')} target="_blank" rel="noopener">
