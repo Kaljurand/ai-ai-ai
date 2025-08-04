@@ -16,10 +16,11 @@ describe('providers module', () => {
   });
 
   it('fetches remaining OpenRouter credits', async () => {
-    const mockData = { data: { credits: { remaining: 7 } } };
+    const mockData = { data: { limit_remaining: 4.7 } };
     const fetchFn = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(mockData) });
-    const credits = await fetchOpenRouterCredits('abc', fetchFn);
-    expect(fetchFn).toHaveBeenCalledWith('https://openrouter.ai/api/v1/limits', { headers: { Authorization: 'Bearer abc' } });
-    expect(credits).toBe(7);
+    const result = await fetchOpenRouterCredits('abc', fetchFn);
+    expect(fetchFn).toHaveBeenCalledWith('https://openrouter.ai/api/v1/key', { headers: { Authorization: 'Bearer abc' } });
+    expect(result.remaining).toBe(4.7);
+    expect(result.raw).toEqual(mockData);
   });
 });

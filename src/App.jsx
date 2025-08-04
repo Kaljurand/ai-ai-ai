@@ -769,10 +769,51 @@ export default function App({ darkMode, setDarkMode }) {
     if (view !== 'config') return;
     (async () => {
       const info = { openai: null, google: null, openrouter: null, mistral: null };
-      try { if (apiKeys.openai) info.openai = await fetchOpenAiCredits(apiKeys.openai, fetchWithLoading); } catch {}
-      try { if (apiKeys.google) info.google = await fetchGoogleCredits(apiKeys.google, fetchWithLoading); } catch {}
-      try { if (apiKeys.openrouter) info.openrouter = await fetchOpenRouterCredits(apiKeys.openrouter, fetchWithLoading); } catch {}
-      try { if (apiKeys.mistral) info.mistral = await fetchMistralCredits(apiKeys.mistral, fetchWithLoading); } catch {}
+
+      if (apiKeys.openai) {
+        const log = startLog('GET', 'https://api.openai.com/v1/dashboard/billing/credit_grants', '', 'openai');
+        try {
+          const { remaining, raw } = await fetchOpenAiCredits(apiKeys.openai, fetchWithLoading);
+          info.openai = remaining;
+          finishLog(log, raw);
+        } catch (e) {
+          finishLog(log, { error: e.message });
+        }
+      }
+
+      if (apiKeys.google) {
+        const log = startLog('GET', 'https://generativelanguage.googleapis.com/v1beta/creditGrants', '', 'google');
+        try {
+          const { remaining, raw } = await fetchGoogleCredits(apiKeys.google, fetchWithLoading);
+          info.google = remaining;
+          finishLog(log, raw);
+        } catch (e) {
+          finishLog(log, { error: e.message });
+        }
+      }
+
+      if (apiKeys.openrouter) {
+        const log = startLog('GET', 'https://openrouter.ai/api/v1/key', '', 'openrouter');
+        try {
+          const { remaining, raw } = await fetchOpenRouterCredits(apiKeys.openrouter, fetchWithLoading);
+          info.openrouter = remaining;
+          finishLog(log, raw);
+        } catch (e) {
+          finishLog(log, { error: e.message });
+        }
+      }
+
+      if (apiKeys.mistral) {
+        const log = startLog('GET', 'https://api.mistral.ai/v1/credits', '', 'mistral');
+        try {
+          const { remaining, raw } = await fetchMistralCredits(apiKeys.mistral, fetchWithLoading);
+          info.mistral = remaining;
+          finishLog(log, raw);
+        } catch (e) {
+          finishLog(log, { error: e.message });
+        }
+      }
+
       setCredits(info);
     })();
   }, [view, apiKeys.openai, apiKeys.google, apiKeys.openrouter, apiKeys.mistral]);

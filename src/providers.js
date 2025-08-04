@@ -126,49 +126,41 @@ export async function fetchOpenAiCredits(apiKey, fetchFn = fetch) {
   const res = await fetchFn(url, { headers });
   if (!res.ok) throw new Error('Failed to fetch OpenAI credits');
   const data = await res.json();
-  return data.total_available ?? null;
+  return { remaining: data.total_available ?? null, raw: data };
 }
 
 export async function fetchGoogleCredits(apiKey, fetchFn = fetch) {
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/creditGrants?key=${apiKey}`;
-    const res = await fetchFn(url);
-    if (!res.ok) throw new Error('Failed to fetch Google credits');
-    const data = await res.json();
-    return data.total_available ?? null;
-  } catch {
-    return null;
-  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/creditGrants?key=${apiKey}`;
+  const res = await fetchFn(url);
+  if (!res.ok) throw new Error('Failed to fetch Google credits');
+  const data = await res.json();
+  const remaining =
+    data.totalRemaining ??
+    (data.totalGranted !== undefined && data.totalUsed !== undefined
+      ? data.totalGranted - data.totalUsed
+      : null);
+  return { remaining, raw: data };
 }
 
 export async function fetchOpenRouterCredits(apiKey, fetchFn = fetch) {
-  try {
-    const url = 'https://openrouter.ai/api/v1/limits';
-    const headers = { Authorization: `Bearer ${apiKey}` };
-    const res = await fetchFn(url, { headers });
-    if (!res.ok) throw new Error('Failed to fetch OpenRouter credits');
-    const data = await res.json();
-    return (
-      data.data?.credits?.remaining ??
-      data.data?.credit?.remaining ??
-      data.credits?.remaining ??
-      data.credits ??
-      null
-    );
-  } catch {
-    return null;
-  }
+  const url = 'https://openrouter.ai/api/v1/key';
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  const res = await fetchFn(url, { headers });
+  if (!res.ok) throw new Error('Failed to fetch OpenRouter credits');
+  const data = await res.json();
+  return { remaining: data.data?.limit_remaining ?? null, raw: data };
 }
 
 export async function fetchMistralCredits(apiKey, fetchFn = fetch) {
-  try {
-    const url = 'https://api.mistral.ai/v1/credits';
-    const headers = { 'Authorization': `Bearer ${apiKey}` };
-    const res = await fetchFn(url, { headers });
-    if (!res.ok) throw new Error('Failed to fetch Mistral credits');
-    const data = await res.json();
-    return data.credits ?? null;
-  } catch {
-    return null;
-  }
+  const url = 'https://api.mistral.ai/v1/credits';
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  const res = await fetchFn(url, { headers });
+  if (!res.ok) throw new Error('Failed to fetch Mistral credits');
+  const data = await res.json();
+  const remaining =
+    data.remaining_credits ??
+    data.credits?.remaining ??
+    data.credits ??
+    null;
+  return { remaining, raw: data };
 }
