@@ -153,6 +153,10 @@ describe('App.jsx compilation', () => {
     const providers = fs.readFileSync('src/providers.js', 'utf8');
     expect(providers.includes('fetchOpenAiCredits')).toBe(true);
   });
+  it('refreshes credits when API keys change', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('[view, apiKeys.openai')).toBe(true);
+  });
   it('formats model pricing', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('pricePerM')).toBe(true);

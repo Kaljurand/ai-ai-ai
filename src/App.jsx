@@ -775,7 +775,7 @@ export default function App({ darkMode, setDarkMode }) {
       try { if (apiKeys.mistral) info.mistral = await fetchMistralCredits(apiKeys.mistral, fetchWithLoading); } catch {}
       setCredits(info);
     })();
-  }, [view]);
+  }, [view, apiKeys.openai, apiKeys.google, apiKeys.openrouter, apiKeys.mistral]);
 
   const textModelsList = [
     ...openRouterModels
