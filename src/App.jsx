@@ -155,6 +155,8 @@ function PersistedGrid({ storageKey, t, initialCols = {}, initialSort = [], ...p
   const handleCellClick = (params, event) => {
     if (params.field === 'actions') return;
     if (event.target.closest('input[type="checkbox"]')) return;
+    const sel = window.getSelection?.();
+    if (sel && !sel.isCollapsed) return;
     setPreviewRow(params.row);
   };
   return (
