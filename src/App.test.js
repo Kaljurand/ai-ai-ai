@@ -109,6 +109,11 @@ describe('App.jsx compilation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes("closest('input[type=\"checkbox\"]')")).toBe(true);
   });
+  it('ignores text selection clicks', () => {
+    const code = fs.readFileSync('src/App.jsx', 'utf8');
+    expect(code.includes('getSelection')).toBe(true);
+    expect(code.includes('isCollapsed')).toBe(true);
+  });
   it('includes generateTranscript translation', () => {
     const code = fs.readFileSync('src/App.jsx', 'utf8');
     expect(code.includes('generateTranscript')).toBe(true);
